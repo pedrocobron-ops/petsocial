@@ -2353,6 +2353,72 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"mozart_acoes": {
+                  Row: {
+                    "criado_em": string,"desfeito_em": string | null,"desfeito_por": string | null,"estado": string,"feito_em": string | null,"ferramenta": string,"id": string,"petshop_id": string,"resumo": Json | null,"user_id": string | null,"uso_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "criado_em"?: string,"desfeito_em"?: string | null,"desfeito_por"?: string | null,"estado"?: string,"feito_em"?: string | null,"ferramenta": string,"id"?: string,"petshop_id": string,"resumo"?: Json | null,"user_id"?: string | null,"uso_id": string
+                  }
+                  Update: {
+                    "criado_em"?: string,"desfeito_em"?: string | null,"desfeito_por"?: string | null,"estado"?: string,"feito_em"?: string | null,"ferramenta"?: string,"id"?: string,"petshop_id"?: string,"resumo"?: Json | null,"user_id"?: string | null,"uso_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "mozart_acoes_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"mozart_acoes_linhas": {
+                  Row: {
+                    "acao_id": string,"antes": Json | null,"chave": string,"depois": Json | null,"em": string,"id": number,"linha_id": string,"op": string,"petshop_id": string,"tabela": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "acao_id": string,"antes"?: Json | null,"chave": string,"depois"?: Json | null,"em"?: string,"id"?: never,"linha_id": string,"op": string,"petshop_id": string,"tabela": string
+                  }
+                  Update: {
+                    "acao_id"?: string,"antes"?: Json | null,"chave"?: string,"depois"?: Json | null,"em"?: string,"id"?: never,"linha_id"?: string,"op"?: string,"petshop_id"?: string,"tabela"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "mozart_acoes_linhas_acao_id_fkey"
+      columns: ["acao_id"]
+isOneToOne: false
+      referencedRelation: "mozart_acoes"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "mozart_acoes_linhas_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"mozart_automatico_aceites": {
+                  Row: {
+                    "em": string,"id": number,"ip": string | null,"ligou": boolean,"navegador": string | null,"nome": string | null,"petshop_id": string,"user_id": string | null,"versao": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "em"?: string,"id"?: never,"ip"?: string | null,"ligou": boolean,"navegador"?: string | null,"nome"?: string | null,"petshop_id": string,"user_id"?: string | null,"versao": string
+                  }
+                  Update: {
+                    "em"?: string,"id"?: never,"ip"?: string | null,"ligou"?: boolean,"navegador"?: string | null,"nome"?: string | null,"petshop_id"?: string,"user_id"?: string | null,"versao"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "mozart_automatico_aceites_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"mozart_tempos": {
                   Row: {
                     "em": string,"ferramentas": number,"fim": string,"id": number,"modo": string,"petshop_id": string,"primeiro_ms": number | null,"sinal_ms": number | null,"tokens_cache_gravados": number,"tokens_cache_lidos": number,"tokens_entrada": number,"tokens_saida": number,"total_ms": number,"voltas": number
@@ -2857,14 +2923,14 @@ isOneToOne: false
                   ]
                 },"profissionais": {
                   Row: {
-                    "acessos": (string)[] | null,"atende": boolean,"ativo": boolean,"comissao_pct": number,"cor": string,"criado_em": string,"email_convite": string | null,"escala": Json | null,"funcao": string | null,"id": string,"nome": string,"papel": Database["public"]['Enums']["papel_equipe"],"petshop_id": string,"user_id": string | null,"ve_financeiro": boolean
+                    "acessos": (string)[] | null,"atende": boolean,"ativo": boolean,"comissao_pct": number,"cor": string,"criado_em": string,"email_convite": string | null,"escala": Json | null,"funcao": string | null,"id": string,"mozart_automatico": boolean,"nome": string,"papel": Database["public"]['Enums']["papel_equipe"],"petshop_id": string,"user_id": string | null,"ve_financeiro": boolean
                   }
                   ComputedFields: never
                   Insert: {
-                    "acessos"?: (string)[] | null,"atende"?: boolean,"ativo"?: boolean,"comissao_pct"?: number,"cor"?: string,"criado_em"?: string,"email_convite"?: string | null,"escala"?: Json | null,"funcao"?: string | null,"id"?: string,"nome": string,"papel"?: Database["public"]['Enums']["papel_equipe"],"petshop_id": string,"user_id"?: string | null,"ve_financeiro"?: boolean
+                    "acessos"?: (string)[] | null,"atende"?: boolean,"ativo"?: boolean,"comissao_pct"?: number,"cor"?: string,"criado_em"?: string,"email_convite"?: string | null,"escala"?: Json | null,"funcao"?: string | null,"id"?: string,"mozart_automatico"?: boolean,"nome": string,"papel"?: Database["public"]['Enums']["papel_equipe"],"petshop_id": string,"user_id"?: string | null,"ve_financeiro"?: boolean
                   }
                   Update: {
-                    "acessos"?: (string)[] | null,"atende"?: boolean,"ativo"?: boolean,"comissao_pct"?: number,"cor"?: string,"criado_em"?: string,"email_convite"?: string | null,"escala"?: Json | null,"funcao"?: string | null,"id"?: string,"nome"?: string,"papel"?: Database["public"]['Enums']["papel_equipe"],"petshop_id"?: string,"user_id"?: string | null,"ve_financeiro"?: boolean
+                    "acessos"?: (string)[] | null,"atende"?: boolean,"ativo"?: boolean,"comissao_pct"?: number,"cor"?: string,"criado_em"?: string,"email_convite"?: string | null,"escala"?: Json | null,"funcao"?: string | null,"id"?: string,"mozart_automatico"?: boolean,"nome"?: string,"papel"?: Database["public"]['Enums']["papel_equipe"],"petshop_id"?: string,"user_id"?: string | null,"ve_financeiro"?: boolean
                   }
                   Relationships: [
                     {
@@ -4494,6 +4560,33 @@ isOneToOne: false
                            },
 "modo_envio_marcar":
 { Args: { "p": string,"p_refs": (string)[],"p_tipo": string }; Returns: Json
+                           },
+"mozart_acao_comecar":
+{ Args: { "p_ferramenta": string,"p_petshop": string,"p_resumo"?: Json,"p_uso": string }; Returns: string
+                           },
+"mozart_acao_terminar":
+{ Args: { "p_acao": string,"p_ok": boolean }; Returns: boolean
+                           },
+"mozart_automatico_estado":
+{ Args: { "p_petshop": string }; Returns: Json
+                           },
+"mozart_automatico_ligar":
+{ Args: { "p_ligar": boolean,"p_petshop": string,"p_versao"?: string }; Returns: Json
+                           },
+"mozart_automatico_pode":
+{ Args: { "p": string }; Returns: boolean
+                           },
+"mozart_automatico_vale":
+{ Args: { "p": string }; Returns: boolean
+                           },
+"mozart_desfazer":
+{ Args: { "p_acao": string }; Returns: Json
+                           },
+"mozart_desfazer_fim":
+{ Args: { "p_acao": string }; Returns: undefined
+                           },
+"mozart_desfazer_ler":
+{ Args: { "p_acao": string }; Returns: Json
                            },
 "mozart_tempo_registrar":
 { Args: { "p_cache_gravados": number,"p_cache_lidos": number,"p_entrada": number,"p_ferramentas": number,"p_fim": string,"p_modo": string,"p_petshop": string,"p_primeiro_ms": number,"p_saida": number,"p_sinal_ms": number,"p_total_ms": number,"p_voltas": number }; Returns: undefined

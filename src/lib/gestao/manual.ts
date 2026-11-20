@@ -165,6 +165,8 @@ const BASE: TopicoBase[] = [
       "Com a mão molhada, fale curto: \"o Thor foi para a secagem\", \"dei a ração das 13h da Belinha\", \"a Pandora vomitou no pátio, anota ocorrência\". A ocorrência entra em Ocorrências, onde o dono vê no Hoje.",
     ],
     dicas: [
+      "Modo automático (opcional): nos ajustes do Mozart, ligue Modo automático e aceite o aviso. Ele passa a fazer na hora, sem o cartão, e no topo aparece Automático. Para desligar, toque em Automático. A equipe só pode ligar se o dono permitir, em Meu pet shop, O negócio.",
+      "No automático, cada ação aparece num cartão Feito com o botão Desfazer (vale por 24 horas, para quem pediu ou para o dono). O Desfazer desmarca o horário, apaga o lançamento, volta o preço ou o cadastro como era. Se algo mudou depois ou o caixa já fechou, ele explica por que não deu.",
       "A página recarregou (o celular trocou de aplicativo, você puxou a tela para atualizar)? A conversa volta como estava, inclusive o cartão que espera o Pode fazer. O cartão continua pedindo a sua confirmação, e cada cartão é gravado uma vez só, mesmo que a página recarregue no meio.",
       "Recarregou enquanto ele ainda escrevia? O pedaço que já tinha chegado volta com Resposta interrompida embaixo. Toque em Perguntar de novo para receber a resposta inteira.",
       "Enquanto ele pensa, uma linha embaixo dos três pontinhos diz o que está fazendo (Pensando…, Somando o dinheiro…).",
@@ -183,7 +185,7 @@ const BASE: TopicoBase[] = [
       "O Mozart tem um limite de pedidos por dia. Se ele avisar que já atendeu todos os pedidos de hoje, volta no dia seguinte; as telas seguem funcionando. Veja O Mozart tem limite de uso?",
       "Dá para falar em vez de escrever: veja Falar com o Mozart.",
     ],
-    palavras: ["mozart", "assistente", "ia", "inteligencia artificial", "o que posso pedir", "mozart receber divida", "mozart fiado", "me pagou o que devia"] },
+    palavras: ["mozart", "assistente", "ia", "inteligencia artificial", "o que posso pedir", "modo automatico", "automatico", "sem cartao", "desfazer mozart", "mozart sem confirmar", "mozart receber divida", "mozart fiado", "me pagou o que devia"] },
   { id: "mozart-voz", titulo: "Falar com o Mozart", secao: "primeiros", quem: "todos", rota: HOJE,
     passos: [
       "Abra o Mozart e toque no microfone, ao lado da caixa de mensagem.",

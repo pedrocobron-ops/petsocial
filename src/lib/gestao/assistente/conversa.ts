@@ -74,10 +74,21 @@ export function contaLiberada(doBanco: unknown, petshop: { status: string; teste
 }
 export const DEMOROU = "Esse pedido está demorando mais que o normal e eu parei por aqui. Pode repetir de um jeito mais direto (por exemplo: o nome do pet, o valor e a forma de pagamento)?";
 
+/**
+ * Uma ação feita no modo automático (o cartão "Feito" da tela): o mesmo resumo do cartão de confirmação, se deu certo e,
+ * quando deu, a ação guardada para o Desfazer (`acao`, de mozart_acoes; null se não deu para guardar).
+ */
+export type Feito = { id: string; ferramenta: string; resumo: Resumo; ok: boolean; acao: string | null; erro?: string };
+/**
+ * Modo automático: recebe os cartões que seriam mostrados e grava na hora, em ordem, pelo mesmo caminho do "Pode fazer"
+ * (`responderCartoes`). Devolve o resultado de cada ferramenta (na ordem dos pedidos) para a conversa seguir.
+ */
+export type GravarNoAutomatico = (o: { pendentes: Anthropic.Beta.BetaContentBlockParam[]; propostas: Proposta[]; parciais: Resultado[] }) => Promise<{ resultados: Resultado[]; mudou: boolean; feitos: Feito[] }>;
+
 type Saida =
   | { tipo: "limite" }
   | { tipo: "recusa"; mensagens: Msg[] }
-  | { tipo: "ok"; mensagens: Msg[]; texto: string; propostas: Proposta[]; parciais: Resultado[]; links: LinkZap[]; cortou: boolean };
+  | { tipo: "ok"; mensagens: Msg[]; texto: string; propostas: Proposta[]; parciais: Resultado[]; links: LinkZap[]; cortou: boolean; feitos: Feito[]; mudou: boolean };
 
 /** Os nomes de pets e tutores que as ferramentas já devolveram nesta conversa. */
 function nomesDaConversa(mensagens: Msg[]): string[] {
@@ -100,6 +111,8 @@ export async function voltas(o: {
   avisos?: Avisos;
   /** Preenchido durante as voltas (voltas, consultas e tokens). */
   medidas?: Medidas;
+  /** Modo automático ligado (o banco confirmou): grava sem cartão e a conversa segue. Sem ele, para nos cartões. */
+  automatico?: GravarNoAutomatico;
 }): Promise<Saida> {
   const { c, mensagens, liberado } = o;
   const m = o.medidas ?? medidasZeradas();
@@ -110,6 +123,8 @@ export async function voltas(o: {
   const links: LinkZap[] = [];
   let texto = "";
   let cortou = false;
+  const feitos: Feito[] = [];
+  let mudou = false;
   const max = o.maxVoltas ?? MAX_VOLTAS;
   for (let volta = 0; volta < max; volta++) {
     if (volta > 0 && relogio() - inicio > (o.prazoMs ?? PRAZO_MS)) { cortou = true; break; }
@@ -183,12 +198,25 @@ export async function voltas(o: {
       }
     }
     const parciais = porPedido.filter((r): r is Resultado => r !== null);
+    // modo automático: grava na hora, em ordem (o mesmo caminho do "Pode fazer"), e a conversa segue com o resultado
+    if (propostas.length && o.automatico) {
+      const ultima = mensagens[mensagens.length - 1];
+      const r = await o.automatico({ pendentes: (Array.isArray(ultima.content) ? ultima.content : []) as Anthropic.Beta.BetaContentBlockParam[], propostas, parciais });
+      feitos.push(...r.feitos);
+      mudou ||= r.mudou;
+      mensagens.push({ role: "user", content: r.resultados });
+      if (volta === max - 1) { cortou = false; break; }
+      continue;
+    }
     // há algo para a pessoa confirmar: para aqui e espera os botões
-    if (propostas.length) return { tipo: "ok", mensagens, texto: semPedidoDeConfirmar(texto, true), propostas, parciais, links, cortou: false };
+    if (propostas.length) return { tipo: "ok", mensagens, texto: semPedidoDeConfirmar(texto, true), propostas, parciais, links, cortou: false, feitos, mudou };
     mensagens.push({ role: "user", content: parciais });
   }
   if (cortou && !texto) texto = DEMOROU;
-  return { tipo: "ok", mensagens, texto: semPedidoDeConfirmar(texto, false), propostas: [], parciais: [], links, cortou };
+  // no automático, a frase "confere no cartão" sai sempre (não há cartão); sem sobrar fala, a tela mostra os cartões "Feito"
+  let final = semPedidoDeConfirmar(texto, feitos.length > 0);
+  if (!final && feitos.length) final = feitos.every((f) => f.ok) ? "Pronto, ficou feito." : "Nem tudo deu certo: veja abaixo.";
+  return { tipo: "ok", mensagens, texto: final, propostas: [], parciais: [], links, cortou, feitos, mudou };
 }
 
 const JA_GRAVADA = "Esta ação já tinha sido gravada (o pedido chegou repetido). Nada foi gravado de novo.";
@@ -229,11 +257,19 @@ export async function responderCartoes(o: {
    */
   reservar?: (usoId: string) => Promise<boolean>;
   liberar?: (usoId: string) => Promise<void>;
-}): Promise<{ resultados: Resultado[]; mudou: boolean }> {
+  /**
+   * Modo automático: envolve a gravação de cada ação (a rota abre a ação para o Desfazer e grava com o cabeçalho dela).
+   * Recebe a ferramenta e a função que grava; devolve o que ela devolveu (ou lança o erro dela).
+   */
+  envolver?: (uso: Anthropic.Beta.BetaToolUseBlockParam, gravarAgora: () => Promise<unknown>) => Promise<unknown>;
+}): Promise<{ resultados: Resultado[]; mudou: boolean; feitos: { id: string; ferramenta: string; ok: boolean; erro?: string }[] }> {
   const { c, liberado } = o;
   const resultados: Resultado[] = [];
+  const feitos: { id: string; ferramenta: string; ok: boolean; erro?: string }[] = [];
   let mudou = false;
   let falhou = false;
+  // cada ação confirmada que não gravou (o motivo vai para o cartão "Feito" do automático)
+  const naoFez = (uso: { id: string; name: string }, erro: string) => feitos.push({ id: uso.id, ferramenta: uso.name, ok: false, erro });
   for (const uso of o.pendentes) {
     if (uso.type !== "tool_use") continue;
     const parcial = o.parciais?.find((r) => r.tool_use_id === uso.id);
@@ -241,19 +277,21 @@ export async function responderCartoes(o: {
     const def = definicao(uso.name);
     const decisao = o.decisoes?.find((d) => d.id === uso.id);
     if (!def?.grava || !decisao?.ok) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: "A pessoa descartou esta ação. Nada foi gravado." }); continue; }
-    if (falhou) { resultados.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: PAROU_ANTES }); continue; }
+    if (falhou) { naoFez(uso, "Não foi feito: a anterior deu errado."); resultados.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: PAROU_ANTES }); continue; }
     // a conversa vem do navegador: confere de novo se esta pessoa pode usar a ferramenta (igual à volta do modelo)
-    if (!ferramentaLiberada(def, c)) { falhou = true; resultados.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: motivoDaRecusa(def, c) }); continue; }
-    if (!liberado) { falhou = true; resultados.push({ type: "tool_result", tool_use_id: uso.id, content: "A conta está só para consulta (teste vencido ou assinatura inativa). Nada foi gravado.", is_error: true }); continue; }
+    if (!ferramentaLiberada(def, c)) { falhou = true; naoFez(uso, "Com o seu acesso não dá para fazer isso."); resultados.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: motivoDaRecusa(def, c) }); continue; }
+    if (!liberado) { falhou = true; naoFez(uso, "A conta está só para consulta."); resultados.push({ type: "tool_result", tool_use_id: uso.id, content: "A conta está só para consulta (teste vencido ou assinatura inativa). Nada foi gravado.", is_error: true }); continue; }
     if (o.reservar && !(await o.reservar(uso.id))) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: JA_GRAVADA }); continue; }
     let gravou = false;
     try {
       // a chave desta ação: se o mesmo pedido chegar duas vezes (toque duplo, internet que repetiu), o banco grava uma vez só
       c.chave = `mozart:${uso.id}`;
-      const r = await gravar(c, uso.name, uso.input as Record<string, unknown>);
+      const fazer = () => gravar(c, uso.name, uso.input as Record<string, unknown>);
+      const r = o.envolver ? await o.envolver(uso, fazer) : await fazer();
       gravou = true;
       mudou = true;
       await o.anotar?.(uso.name, uso.input);
+      feitos.push({ id: uso.id, ferramenta: uso.name, ok: true });
       resultados.push({ type: "tool_result", tool_use_id: uso.id, content: JSON.stringify(r) });
     } catch (err) {
       if (err instanceof Error && /_chave_uniq/.test(err.message)) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: JA_GRAVADA }); continue; }
@@ -261,10 +299,12 @@ export async function responderCartoes(o: {
       if (!gravou && o.liberar) await o.liberar(uso.id).catch(() => undefined);
       falhou = true;
       const semPermissao = err instanceof Error && /row-level security|permission denied/i.test(err.message);
-      resultados.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: ehErroDeUso(err) ? err.message : semPermissao ? "Sem permissão para gravar isso." : "Não consegui gravar agora." });
+      const motivo = ehErroDeUso(err) ? err.message : semPermissao ? "Sem permissão para gravar isso." : "Não consegui gravar agora.";
+      naoFez(uso, motivo);
+      resultados.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: motivo });
     } finally {
       c.chave = undefined;
     }
   }
-  return { resultados, mudou };
+  return { resultados, mudou, feitos };
 }

@@ -261,7 +261,8 @@ export default async function TermosDoGestao() {
       {p("ia", "O Mozart, a leitura de fotos e os textos automáticos usam inteligência artificial. Eles podem errar. Confira sempre: o que você confirma vale como feito por você.", <>
         <p>O Gestão usa inteligência artificial (IA) de um fornecedor (veja a Política de privacidade) em várias funções:</p>
         <ul>
-          <li><b>Mozart, o assistente:</b> entende pedidos por texto ou voz, consulta os dados do seu pet shop e mostra um <b>cartão com o que pretende fazer</b>. Nada é gravado antes de alguém tocar para confirmar.</li>
+          <li><b>Mozart, o assistente:</b> entende pedidos por texto ou voz, consulta os dados do seu pet shop e mostra um <b>cartão com o que pretende fazer</b>. Nada é gravado antes de alguém tocar para confirmar, a não ser no modo automático.</li>
+          <li><b>Modo automático (opcional):</b> quem liga, depois de aceitar o aviso, faz o Mozart gravar na hora, sem o cartão. Cada pessoa liga o seu (a equipe, só se o dono permitir) e pode desligar quando quiser. O que ele fizer no automático vale como feito por quem pediu: confira na conversa e, se algo sair diferente, use o Desfazer (vale por 24 horas).</li>
           <li><b>Trazer do caderno:</b> lê fotos e PDFs do caderno ou de outro sistema, tabelas de preço e carteirinhas de vacina e mostra o que leu para você conferir antes de salvar. As fotos e os PDFs enviados para essa leitura não ficam guardados no sistema.</li>
           <li><b>Textos prontos:</b> o Mozart pode escrever o texto do boletim e outras mensagens. São sugestões para você revisar.</li>
           <li><b>Dúvidas pelo link:</b> se você ligar, o link responde perguntas dos tutores usando só o que o link já mostra. Quando não sabe, manda o tutor para o seu WhatsApp.</li>

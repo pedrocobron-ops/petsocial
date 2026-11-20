@@ -2,7 +2,7 @@
 
 import { Selo } from "./marca";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUp, Check, CheckCheck, ChevronDown, MessageCircle, RotateCcw, SlidersHorizontal, Volume2, VolumeX } from "lucide-react";
+import { ArrowUp, Check, CheckCheck, ChevronDown, MessageCircle, RotateCcw, SlidersHorizontal, Undo2, Volume2, VolumeX, Zap } from "lucide-react";
 import { hora, isoDia } from "@/lib/gestao/util";
 import Link from "@/components/gestao/link-depois";
 import { useGestao } from "./contexto";
@@ -13,15 +13,19 @@ import { TextoMozart } from "./texto-mozart";
 import { chaveDaConversa, guardarConversa, lerConversa } from "@/lib/gestao/assistente/guardada";
 import { semNomesDeFerramenta } from "@/lib/gestao/assistente/sem-nomes";
 import { usaModulo } from "@/lib/gestao/modulos";
+import { AVISO_AUTOMATICO, ESTADO_DESLIGADO, VERSAO_AVISO_AUTOMATICO, fraseDoDesfazer, lerEstado, type EstadoAutomatico } from "@/lib/gestao/assistente/automatico";
 
 type Resumo = { titulo: string; linhas: [string, string][] };
 type Proposta = { id: string; ferramenta: string; resumo: Resumo; estado: "pendente" | "sim" | "nao" };
 type LinkZap = { nome: string; texto: string; url: string };
+/** Uma ação feita no modo automático: o cartão "Feito" (os mesmos detalhes do cartão de confirmação) e o Desfazer. */
+type FeitoTela = { id: string; acao: string | null; ferramenta: string; resumo: Resumo; ok: boolean; erro?: string; estado?: "feito" | "desfazendo" | "desfeito" | "nao"; motivo?: string };
 type Item =
   | { tipo: "eu" | "ele" | "erro"; texto: string; quando?: string; saidas?: boolean; jaVisto?: boolean; interrompida?: boolean; repetir?: string }
   | { tipo: "propostas"; lista: Proposta[]; enviado: boolean }
+  | { tipo: "feitos"; lista: FeitoTela[] }
   | { tipo: "links"; lista: LinkZap[] };
-type Resposta = { mensagens: unknown[]; texto: string; propostas: Omit<Proposta, "estado">[]; parciais: unknown[]; links: LinkZap[]; mudou: boolean; erro?: string; mensagem?: string };
+type Resposta = { mensagens: unknown[]; texto: string; propostas: Omit<Proposta, "estado">[]; parciais: unknown[]; links: LinkZap[]; feitos?: FeitoTela[]; automatico?: boolean; mudou: boolean; erro?: string; mensagem?: string };
 /** Um evento da resposta que chega aos poucos (uma linha JSON cada): texto, o que ele está fazendo, e o fim com tudo. */
 type Evento = { t: "texto"; d: string } | { t: "progresso"; frase: string } | ({ t: "fim"; status: number } & Partial<Resposta>);
 
@@ -162,6 +166,13 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
   const podeLer = temLeituraAqui && !semVozPt;
   const fim = useRef<HTMLDivElement>(null);
   const jaPediu = useRef(false);
+  // modo automático: quem diz é o banco (a escolha desta pessoa e a permissão do dono); a tela só mostra e pede para mudar
+  const [auto, setAuto] = useState<EstadoAutomatico>(ESTADO_DESLIGADO);
+  const [avisoAuto, setAvisoAuto] = useState(false);
+  const [entendi, setEntendi] = useState(false);
+  const [mudandoAuto, setMudandoAuto] = useState(false);
+  const [erroAuto, setErroAuto] = useState<string | null>(null);
+  const caixaAuto = useRef<HTMLInputElement>(null);
 
   const guardar = (novos: Item[]) => { memoria.itens = novos; setItens(novos); persistir(); };
   const acrescentar = (...novos: Item[]) => guardar([...memoria.itens, ...novos]);
@@ -173,6 +184,11 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
     return () => { window.clearInterval(relogioEnvio.current); pararDeFalar(); painelAberto = false; persistir(); };
   }, []);
   useEffect(() => { fim.current?.scrollIntoView({ block: "end" }); }, [itens, pensando, aoVivo]);
+  useEffect(() => {
+    let vivo = true;
+    void Promise.resolve(sb.rpc("mozart_automatico_estado", { p_petshop: petshop.id })).then((r) => { if (vivo && !r.error) setAuto(lerEstado(r.data)); }, () => undefined);
+    return () => { vivo = false; };
+  }, [sb, petshop.id]);
   useEffect(() => {
     // no celular a conversa cobre a tela e trava a rolagem de trás; no computador é uma janelinha e a tela segue livre
     const antes = document.documentElement.style.overflow;
@@ -253,7 +269,9 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
         if (voz.atual) { voz.atual.terminar(); voz.atual = null; }
         else if (lerAgora.current) { setLendo(n); falar(j.texto, () => setLendo((x) => (x === n ? null : x))); }
       }
+      if (j.feitos?.length) novos.push({ tipo: "feitos", lista: j.feitos.map((f) => ({ ...f, estado: f.ok ? ("feito" as const) : ("nao" as const) })) });
       if (j.links?.length) novos.push({ tipo: "links", lista: j.links });
+      if (typeof j.automatico === "boolean") { const v = j.automatico; setAuto((a) => (a.efetivo === v ? a : { ...a, efetivo: v })); }
       if (j.propostas.length) novos.push({ tipo: "propostas", enviado: false, lista: j.propostas.map((p) => ({ ...p, estado: "pendente" as const })) });
       acrescentar(...novos);
       if (j.mudou) avisarMudanca();
@@ -388,6 +406,38 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
     void chamar({ decisoes: lista.map((p) => ({ id: p.id, ok: p.estado === "sim" })), parciais: memoria.parciais });
   }
 
+  /** Liga (depois do aviso com "Entendi") ou desliga o modo automático. O banco grava a escolha e o aceite. */
+  async function trocarAuto(ligar: boolean) {
+    if (mudandoAuto) return;
+    setMudandoAuto(true); setErroAuto(null);
+    try {
+      const r = await sb.rpc("mozart_automatico_ligar", { p_petshop: petshop.id, p_ligar: ligar, ...(ligar ? { p_versao: VERSAO_AVISO_AUTOMATICO } : {}) });
+      if (r.error) { setErroAuto(r.error.message || "Não deu para mudar agora. Tente de novo."); return; }
+      setAuto(lerEstado(r.data));
+      setAvisoAuto(false); setEntendi(false);
+    } catch { setErroAuto(textoDeRede(!semInternet())); } finally { setMudandoAuto(false); }
+  }
+
+  /** Desfazer uma ação do automático: o servidor confere e o banco desfaz com as regras desta pessoa. */
+  async function desfazerFeito(id: string) {
+    const trocar = (f: (x: FeitoTela) => FeitoTela) => guardar(memoria.itens.map((i) => (i.tipo === "feitos" && i.lista.some((x) => x.id === id) ? { ...i, lista: i.lista.map((x) => (x.id === id ? f(x) : x)) } : i)));
+    const alvo = memoria.itens.flatMap((i) => (i.tipo === "feitos" ? i.lista : [])).find((x) => x.id === id);
+    if (!alvo?.acao || alvo.estado === "desfazendo" || alvo.estado === "desfeito") return;
+    trocar((x) => ({ ...x, estado: "desfazendo", motivo: undefined }));
+    try {
+      const { data } = await sb.auth.getSession();
+      const r = await fetch("/api/gestao/assistente/desfazer", {
+        method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${data.session?.access_token ?? ""}` },
+        body: JSON.stringify({ petshopId: petshop.id, acao: alvo.acao }),
+      });
+      const j = (await r.json().catch(() => null)) as { ok?: boolean; mensagem?: string } | null;
+      if (j?.ok) { trocar((x) => ({ ...x, estado: "desfeito", motivo: undefined })); avisarMudanca(); return; }
+      trocar((x) => ({ ...x, estado: "feito", motivo: fraseDoDesfazer(j?.mensagem) }));
+    } catch {
+      trocar((x) => ({ ...x, estado: "feito", motivo: textoDeRede(!semInternet()) }));
+    }
+  }
+
   function novaConversa() {
     cancelarEnvio(); pararDeFalar(); setLendo(null); setSemVoz(null);
     memoria.itens = []; memoria.mensagens = []; memoria.parciais = []; memoria.decidindo = null; memoria.esperando = false;
@@ -405,15 +455,24 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
   return (
     <div className="g-ass" onMouseDown={(e) => { if (e.target === e.currentTarget) aoFechar(); }}>
       <section className="g-ass-painel" role="dialog" aria-label="Conversa com o Mozart">
-        <header className="g-ass-topo">
+        <header className={`g-ass-topo${auto.efetivo ? " com-auto" : ""}`}>
           <span className={`foto${foraDoAr ? " fora" : ""}`}><Selo tamanho={42} /><i aria-hidden /></span>
           <div><b>Mozart</b><span>{ditado.ouvindo ? "ouvindo você…" : pensando ? "digitando…" : foraDoAr ? `fora do ar agora · ${petshop.nome}` : `online · ${petshop.nome}`}</span></div>
-          {(ditado.suportado || temLeituraAqui) && <button className="g-ico" onClick={() => setAjustesVoz((a) => !a)} aria-label="Ajustes da voz" aria-expanded={ajustesVoz} title="Ajustes da voz"><SlidersHorizontal /></button>}
-          {itens.length > 0 && <button className="g-ico" style={ditado.suportado || temLeituraAqui ? { marginLeft: 0 } : undefined} onClick={novaConversa} aria-label="Começar conversa nova" title="Conversa nova"><RotateCcw /></button>}
-          <button className="g-ico" style={itens.length || ditado.suportado || temLeituraAqui ? { marginLeft: 0 } : undefined} onClick={aoFechar} aria-label="Fechar a conversa" title="Fechar"><ChevronDown /></button>
+          {auto.efetivo && <button type="button" className="g-ass-auto" onClick={() => { setAjustesVoz(true); window.setTimeout(() => caixaAuto.current?.focus(), 0); }} aria-label="Modo automático ligado. Toque para ver ou desligar"><Zap aria-hidden />Automático</button>}
+          {(ditado.suportado || temLeituraAqui || auto.pode) && <button className="g-ico" style={auto.efetivo ? { marginLeft: 0 } : undefined} onClick={() => setAjustesVoz((a) => !a)} aria-label={ditado.suportado || temLeituraAqui ? "Ajustes da voz" : "Ajustes do Mozart"} aria-expanded={ajustesVoz} title="Ajustes"><SlidersHorizontal /></button>}
+          {itens.length > 0 && <button className="g-ico" style={ditado.suportado || temLeituraAqui || auto.pode || auto.efetivo ? { marginLeft: 0 } : undefined} onClick={novaConversa} aria-label="Começar conversa nova" title="Conversa nova"><RotateCcw /></button>}
+          <button className="g-ico" style={itens.length || ditado.suportado || temLeituraAqui || auto.pode || auto.efetivo ? { marginLeft: 0 } : undefined} onClick={aoFechar} aria-label="Fechar a conversa" title="Fechar"><ChevronDown /></button>
         </header>
         {ajustesVoz && (
           <div className="g-ass-ajustes">
+            {auto.pode && (
+              <label className="g-check" id="mozart-automatico">
+                <input ref={caixaAuto} type="checkbox" checked={auto.ligado} disabled={mudandoAuto}
+                  onChange={(e) => { setErroAuto(null); if (e.target.checked) { setEntendi(false); setAvisoAuto(true); } else void trocarAuto(false); }} />
+                <span>Modo automático<small>Faz na hora, sem o cartão de confirmação. Cada ação tem Desfazer.</small></span>
+              </label>
+            )}
+            {erroAuto && !avisoAuto && <p className="g-ass-voz-dica" role="alert">{erroAuto}</p>}
             {ditado.suportado && (
               <label className="g-check">
                 <input type="checkbox" checked={enviarSozinho} onChange={(e) => { setEnviarSozinho(e.target.checked); guardarEnviarSozinho(e.target.checked); }} />
@@ -433,7 +492,7 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
         <div className="g-ass-conversa" aria-live="polite">
           <span className="g-ass-dia">Hoje</span>
           <div className="g-bolha ela rabo">Oi, {primeiro}! Sou o Mozart, cuido da agenda, dos clientes e das contas com você. {ditado.suportado ? "Pode falar no microfone ou escrever" : "Pode escrever, ou ditar pelo microfone do teclado"}, do seu jeito.</div>
-          <div className="g-bolha ela">Antes de gravar qualquer coisa eu te mostro e você confirma. O que vai ser?</div>
+          <div className="g-bolha ela">{auto.efetivo ? "No modo automático eu faço na hora o que você pedir, e cada ação tem o botão Desfazer. O que vai ser?" : "Antes de gravar qualquer coisa eu te mostro e você confirma. O que vai ser?"}</div>
           {!itens.length && (
             <div className="g-ass-rapidas">
               {sugestoes.map((s) => <button key={s} onClick={() => enviar(s)}>{s}</button>)}
@@ -465,6 +524,24 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
                 <p className="g-pp g-muted" style={{ margin: "8px 0 0" }}>Faço na ordem. Se uma der errado, paro ali e te conto.</p>
               </div>
             )}
+            </div>
+          ) : item.tipo === "feitos" ? (
+            <div key={`f${i}`} className="g-ass-grupo" style={{ display: "contents" }}>
+              {item.lista.map((f) => (
+                <div key={f.id} className={`g-proposta g-ass-feito${f.estado === "desfeito" || f.estado === "nao" ? " descartada" : " feita"}`} data-feito={f.ferramenta}>
+                  <div className="cab"><b>{f.resumo.titulo}</b>
+                    {f.estado === "desfeito" ? <span className="g-tag">Desfeito</span> : f.estado === "nao" ? <span className="g-tag vermelho">Não feito</span> : <span className="g-tag verde"><Check size={13} />Feito</span>}
+                  </div>
+                  <dl>{f.resumo.linhas.map(([k, v], n) => <div key={n} style={{ display: "contents" }}><dt>{k}</dt><dd style={k === "Atenção" ? { color: "var(--g-vermelho)" } : undefined}>{v}</dd></div>)}</dl>
+                  {f.estado === "nao" && f.erro && <p className="g-ass-feito-nota" role="status">{f.erro}</p>}
+                  {f.motivo && <p className="g-ass-feito-nota" role="alert">{f.motivo}</p>}
+                  {f.ok && f.acao && f.estado !== "desfeito" && (
+                    <div className="bts">
+                      <button type="button" className="g-btn sec" disabled={f.estado === "desfazendo"} onClick={() => void desfazerFeito(f.id)}><Undo2 />{f.estado === "desfazendo" ? "Desfazendo…" : "Desfazer"}</button>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           ) : item.tipo === "links" ? (
             <div key={i} className="g-proposta">
@@ -539,6 +616,25 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
             <button className="g-mic enviar" disabled={!texto.trim()} aria-label={pensando ? "Enviar quando o Mozart terminar" : "Enviar"}><ArrowUp /></button>
           )}
         </form>
+        {avisoAuto && (
+          <div className="g-ass-modal" onMouseDown={(e) => { if (e.target === e.currentTarget && !mudandoAuto) setAvisoAuto(false); }}>
+            <div className="g-ass-modal-caixa" role="dialog" aria-modal="true" aria-labelledby="mozart-auto-titulo"
+              onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); setAvisoAuto(false); } }}>
+              <h2 id="mozart-auto-titulo">{AVISO_AUTOMATICO.titulo}</h2>
+              <p>{AVISO_AUTOMATICO.texto}</p>
+              <p>{AVISO_AUTOMATICO.depois}</p>
+              <label className="g-check">
+                <input type="checkbox" checked={entendi} onChange={(e) => setEntendi(e.target.checked)} autoFocus />
+                <span>{AVISO_AUTOMATICO.entendi}</span>
+              </label>
+              {erroAuto && <p className="g-ass-feito-nota" role="alert">{erroAuto}</p>}
+              <div className="bts">
+                <button type="button" className="g-btn sec" disabled={mudandoAuto} onClick={() => setAvisoAuto(false)}>{AVISO_AUTOMATICO.agoraNao}</button>
+                <button type="button" className="g-btn pri" disabled={!entendi || mudandoAuto} onClick={() => void trocarAuto(true)}><Zap />{AVISO_AUTOMATICO.ligar}</button>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
     </div>
   );

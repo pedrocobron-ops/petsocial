@@ -3,6 +3,7 @@ import type { Contexto } from "./ferramentas";
 import { nomeDaCasa, usaCasa } from "../modulos";
 import { servicoDeCasa } from "./ferramenta-estadia";
 import { areasQueFaltam } from "./permissao";
+import { INSTRUCOES_AUTOMATICO } from "./automatico";
 
 /** Parte fixa das instruções (igual para todos os pet shops: fica em cache). */
 export const INSTRUCOES = `Você é o Mozart, o assistente do Maestro Pet Gestão, um sistema para pet shops pequenos do Brasil. Você trabalha para a equipe do pet shop como um secretário que conhece o negócio: marca e remarca horários, cadastra pets, cuida da creche e do hotel, dos pacotes, do caixa e do estoque, cadastra e muda serviços e preços, produtos, modelos de pacote, dados dos tutores, horário de funcionamento e diárias, anota a saúde dos pets, responde perguntas sobre a agenda e o dinheiro e avisa o que precisa de atenção. Quem fala com você é o dono ou alguém da equipe, muitas vezes por áudio transcrito, no meio do trabalho.
@@ -127,5 +128,5 @@ ${servicos || "(nenhum serviço ativo)"}
 ${desativados ? `Serviços desativados (fora da agenda):\n${desativados}\n` : ""}Equipe:
 ${equipe}
 ${casaSo(c)}${proximosDias(c.agora) ? `${proximosDias(c.agora)}\n` : ""}${diasEspeciaisDoContexto(c.diasEspeciais, c.agora) ? `${diasEspeciaisDoContexto(c.diasEspeciais, c.agora)}\n` : ""}Quem está falando com você: ${c.eu.nome} (${c.eu.papel}). ${c.cuidoDoFinanceiro ? "Tem acesso ao financeiro." : c.vejoFinanceiro ? "Recebe e opera o caixa, mas não vê o financeiro (despesas, contas a pagar, resumo do mês)." : "Não tem acesso ao financeiro: não vê valores, preços, quem deve nem quanto entrou. Para qualquer pergunta de dinheiro (\"quanto o dono do Bob deve?\", \"quem está devendo?\", \"quanto entrou?\"), responda que com o acesso dela você não consegue ver valores e que isso é com quem cuida do financeiro. Nunca responda que não deve nada nem que está zerado."}${areasQueFaltam(c).length ? ` Não abre: ${areasQueFaltam(c).join(", ")}. Se pedir algo dessas áreas (marcar horário sem ter Agenda, por exemplo), responda logo que com o acesso dela você não consegue fazer isso, que é com quem tem a área (ou com o dono, em Equipe), e não monte cartão.` : ""}
-${c.equipe.filter((p) => p.ativo && p.atende).length <= 1 ? `Só uma pessoa atende: não precisa perguntar quem vai atender.${c.equipe.filter((p) => p.ativo).length <= 1 ? " Ela trabalha sozinha: não fale em \"equipe\"." : ""}` : "Mais de uma pessoa atende: se a pessoa não disser quem, marque sem profissional definido."}`;
+${c.equipe.filter((p) => p.ativo && p.atende).length <= 1 ? `Só uma pessoa atende: não precisa perguntar quem vai atender.${c.equipe.filter((p) => p.ativo).length <= 1 ? " Ela trabalha sozinha: não fale em \"equipe\"." : ""}` : "Mais de uma pessoa atende: se a pessoa não disser quem, marque sem profissional definido."}${c.automatico ? `\n${INSTRUCOES_AUTOMATICO}` : ""}`;
 }
