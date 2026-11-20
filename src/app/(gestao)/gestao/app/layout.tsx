@@ -1,15 +1,11 @@
-"use client";
+import { headers } from "next/headers";
+import LayoutDoApp from "./layout-cliente";
 
-import { GestaoProvider } from "@/components/gestao/contexto";
-import { AvisosProvider } from "@/components/gestao/ui";
-import Casca from "@/components/gestao/casca";
-
-export default function Layout({ children }: { children: React.ReactNode }) {
-  return (
-    <GestaoProvider>
-      <AvisosProvider>
-        <Casca>{children}</Casca>
-      </AvisosProvider>
-    </GestaoProvider>
-  );
+/**
+ * O aplicativo roda com a regra de conteúdo que vale (src/middleware.ts): cada página sai do servidor na hora, com o nonce
+ * do pedido nos scripts (uma página guardada no build não teria o nonce e o navegador barraria os scripts).
+ */
+export default async function Layout({ children }: { children: React.ReactNode }) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+  return <LayoutDoApp nonce={nonce}>{children}</LayoutDoApp>;
 }

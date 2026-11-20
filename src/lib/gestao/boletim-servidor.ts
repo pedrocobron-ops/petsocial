@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./banco";
 import { SUPABASE_CHAVE, SUPABASE_URL } from "./supabase";
 import { BUCKET_BOLETIM, type TipoDoBoletim } from "./boletim";
+import { garantirTrava, segredoDoServidor } from "./servidor";
 
 /**
  * O lado do servidor da página pública do boletim (só a chave pública: não há chave de serviço no aplicativo). Só importar em
@@ -94,7 +95,7 @@ function recusa(e: { code?: string; message: string }): { ok: false; status: num
 
 /**
  * O tutor autoriza pela página do boletim. O banco monta e guarda o texto exato e, junto, o IP e o navegador de quem tocou
- * (migração 20261210: boletim_autorizar lê x-maestro-ip e x-maestro-navegador do pedido; sem eles, os do servidor).
+ * (migração 20261210: boletim_autorizar lê x-maestro-ip e x-maestro-navegador do pedido; 20261245: só com o segredo do servidor).
  */
 export async function autorizarFoto(token: string, escopo: EscopoDaFoto, marcar: string, ip = "", navegador = ""): Promise<RespostaDoBanco<AutorizacaoAtual>> {
   const quem: Record<string, string> = {};
@@ -104,7 +105,12 @@ export async function autorizarFoto(token: string, escopo: EscopoDaFoto, marcar:
     auth: { persistSession: false, autoRefreshToken: false },
     global: { headers: quem, fetch: (u, i) => fetch(u, { ...i, cache: "no-store" }) },
   });
-  const r = await sb.rpc("boletim_autorizar", { p_token: token, p_escopo: escopo, p_marcar: marcar });
+  // o IP e o navegador repassados só valem no banco com o segredo do servidor (migração 20261245); sem ele, o banco usa o
+  // endereço e o navegador que ele mesmo vê
+  await garantirTrava();
+  let r = await sb.rpc("boletim_autorizar", { p_token: token, p_escopo: escopo, p_marcar: marcar, p_segredo: segredoDoServidor() ?? undefined });
+  // banco ainda sem o parâmetro novo: como antes
+  if (r.error && (r.error.code === "PGRST202" || r.error.code === "42883")) r = await sb.rpc("boletim_autorizar", { p_token: token, p_escopo: escopo, p_marcar: marcar });
   if (r.error) return recusa(r.error);
   return { ok: true, dados: r.data as unknown as AutorizacaoAtual };
 }

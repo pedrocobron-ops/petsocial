@@ -174,6 +174,7 @@ const soma = (P) => B.sql(`select coalesce(sum(case when tipo='entrada' then val
   B.must(await adm.auth.signUp({ email: emailAdm, password: SENHA, options: B.dadosDoCadastro() }), 'cadastro do admin');
   const uidAdm = (await adm.auth.getUser()).data.user.id;
   B.sql(`insert into admins (user_id) values ('${uidAdm}') on conflict do nothing`);
+  await B.adminForte(adm); // o painel só responde com o segundo fator (aal2, migração 20261245)
   T.depois(() => B.sql(`delete from admins where user_id='${uidAdm}'; delete from auth.users where id='${uidAdm}'`));
   for (const f of ['admin_copias', 'admin_exclusoes']) {
     T.recusa(`anônimo recusado em ${f}`, await anon.rpc(f));

@@ -290,6 +290,7 @@ const noStorage = (caminhos) => B.num(`select count(*) from storage.objects wher
   B.must(await adm.auth.signUp({ email: emailAdm, password: SENHA, options: B.dadosDoCadastro() }), 'cadastro do admin');
   const uidAdm = (await adm.auth.getUser()).data.user.id;
   B.sql(`insert into admins (user_id) values ('${uidAdm}') on conflict do nothing`);
+  await B.adminForte(adm); // o painel só responde com o segundo fator (aal2, migração 20261245)
   T.depois(() => B.sql(`delete from admins where user_id='${uidAdm}'`));
   const uidDono = B.sql(`select id from auth.users where email = ${B.q(L.emails.dono)}`);
   const conv = B.sql(`insert into conversas (petshop_id, user_id, canal, pergunta, resposta, resolveu) values

@@ -99,9 +99,13 @@ async function tratar(req: Request) {
   // a contagem leva o segredo do servidor: quem chama a função direto com a chave pública não gasta a cota do pet shop
   const segredo = segredoDoServidor() ?? undefined;
   await garantirTrava();
-  let conta = await sb.rpc("link_ia_contar", { p_codigo: codigo, p_segredo: segredo });
+  // a rede de quem pergunta (o freio por rede do banco vale em todas as instâncias; o IP só vale lá com o segredo)
+  const comRede = { p_codigo: codigo, p_segredo: segredo, ...(rede !== "sem-rede" ? { p_rede: rede.slice(0, 64) } : {}) };
+  let conta = await sb.rpc("link_ia_contar", comRede);
+  // banco ainda sem o parâmetro novo (antes da migração 20261245): como antes
+  if (conta.error && (conta.error.code === "PGRST202" || conta.error.code === "42883")) conta = await sb.rpc("link_ia_contar", { p_codigo: codigo, p_segredo: segredo });
   // o banco não conhece o segredo deste servidor (chave trocada, trava nunca ligada): grava a trava e tenta mais uma vez
-  if ((conta.data as { motivo?: string } | null)?.motivo === "recusado" && ["ok", "gravou"].includes(await garantirTrava(true))) conta = await sb.rpc("link_ia_contar", { p_codigo: codigo, p_segredo: segredo });
+  if ((conta.data as { motivo?: string } | null)?.motivo === "recusado" && ["ok", "gravou"].includes(await garantirTrava(true))) conta = await sb.rpc("link_ia_contar", comRede);
   const contou = conta.data as { ok?: boolean; motivo?: string } | null;
   if (conta.error) { await registrarErroServidor("/api/gestao/link-ia", erroDoBanco(conta.error, "link_ia_contar")); return responder({ texto: foraTexto(nome), fora: true }); }
   if (contou?.motivo === "recusado") { console.error("[link-ia] o banco recusou o segredo do servidor: grave de novo no painel (aba Cakto)"); return responder({ texto: foraTexto(nome), fora: true }); }

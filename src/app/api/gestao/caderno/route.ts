@@ -124,6 +124,7 @@ async function tratar(req: Request) {
     if (c.motivo === "limite") return erro(429, "limite", LIMITE(c.limite ?? 0, c.restam ?? 0), { restam: c.restam, limite: c.limite });
     if (c.motivo === "geral") return erro(429, "ocupado", "A leitura está com muitos pedidos hoje. Tente de novo amanhã.", { restam: c.restam, limite: c.limite });
     if (c.motivo === "fechado") return erro(403, "fechado", "A conta está só para consulta: a leitura volta quando a assinatura estiver em dia.");
+    if (c.motivo === "email") return erro(403, "email", "No teste grátis, a leitura começa depois que o e-mail do dono da conta é confirmado. Para confirmar, saia, toque em \"Esqueci a senha\" na tela de entrar e abra o link que chega no e-mail.");
     return erro(403, "sem_acesso", "Trazer do caderno é para quem cuida dos clientes. Peça ao dono do pet shop.");
   }
 

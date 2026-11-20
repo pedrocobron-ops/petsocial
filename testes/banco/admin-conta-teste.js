@@ -14,6 +14,7 @@ const T = require('../lib/teste')('admin-conta-teste');
   B.must(await adm.auth.signUp({ email: emailAdm, password: SENHA, options: B.dadosDoCadastro() }), 'cadastro do admin');
   const uid = (await adm.auth.getUser()).data.user.id;
   B.sql(`insert into admins (user_id) values ('${uid}') on conflict do nothing`);
+  await B.adminForte(adm); // o painel só responde com o segundo fator (aal2, migração 20261245)
   T.depois(() => B.sql(`delete from admins where user_id='${uid}'; delete from auth.users where id='${uid}'`));
   const P = L.P;
   // a loja paga (entra em pagantes, planos e vendas), com um pagamento da Cakto e a origem por vendedor

@@ -16,6 +16,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
   B.must(await adm.auth.signUp({ email: emailAdm, password: SENHA, options: B.dadosDoCadastro() }), 'cadastro do admin');
   const uid = (await adm.auth.getUser()).data.user.id;
   B.sql(`insert into admins (user_id) values ('${uid}') on conflict do nothing`); // só por SQL
+  await B.adminForte(adm); // o painel só responde com o segundo fator (aal2, migração 20261245)
   const ap = (x) => `t${L.suf.replace(/[^a-z0-9]/g, '')}${x}`; // aparelhos deste teste
   const marca = L.suf.replace(/[0-9]/g, '').slice(0, 6) || 'xyz'; // sem números: a assinatura troca número por 0
   T.depois(() => B.sql(`delete from admins where user_id='${uid}'; delete from erros_app_resolvidos where assinatura in (select assinatura from erros_app where aparelho like '${ap('')}%'); delete from erros_app where aparelho like '${ap('')}%'; delete from erros_app_freio where chave like 'a:${ap('')}%';`));

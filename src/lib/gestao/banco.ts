@@ -1191,10 +1191,10 @@ isOneToOne: false
       referencedColumns: ["id"]
     },{
       foreignKeyName: "diario_fotos_pet_id_fkey"
-      columns: ["pet_id"]
+      columns: ["pet_id","petshop_id"]
 isOneToOne: false
       referencedRelation: "pets"
-      referencedColumns: ["id"]
+      referencedColumns: ["id","petshop_id"]
     },{
       foreignKeyName: "diario_fotos_petshop_id_fkey"
       columns: ["petshop_id"]
@@ -1845,6 +1845,20 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"freios_rede": {
+                  Row: {
+                    "chave": string,"janela": string,"n": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "chave": string,"janela": string,"n"?: number
+                  }
+                  Update: {
+                    "chave"?: string,"janela"?: string,"n"?: number
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"hotel_precos": {
                   Row: {
                     "atraso": NonNullable<Json>,"atualizado_em": string,"feriado": NonNullable<Json>,"petshop_id": string
@@ -1923,16 +1937,16 @@ isOneToOne: false
       referencedColumns: ["id","petshop_id"]
     },{
       foreignKeyName: "lancamentos_conta_id_fkey"
-      columns: ["conta_id"]
+      columns: ["conta_id","petshop_id"]
 isOneToOne: false
       referencedRelation: "lancamentos"
-      referencedColumns: ["id"]
+      referencedColumns: ["id","petshop_id"]
     },{
       foreignKeyName: "lancamentos_devolucao_de_fkey"
-      columns: ["devolucao_de"]
+      columns: ["devolucao_de","petshop_id"]
 isOneToOne: false
       referencedRelation: "lancamentos"
-      referencedColumns: ["id"]
+      referencedColumns: ["id","petshop_id"]
     },{
       foreignKeyName: "lancamentos_diferenca_de_fkey"
       columns: ["diferenca_de","petshop_id"]
@@ -1941,10 +1955,10 @@ isOneToOne: false
       referencedColumns: ["id","petshop_id"]
     },{
       foreignKeyName: "lancamentos_multa_de_fkey"
-      columns: ["multa_de"]
+      columns: ["multa_de","petshop_id"]
 isOneToOne: false
       referencedRelation: "lancamentos"
-      referencedColumns: ["id"]
+      referencedColumns: ["id","petshop_id"]
     },{
       foreignKeyName: "lancamentos_petshop_id_fkey"
       columns: ["petshop_id"]
@@ -3281,6 +3295,9 @@ isOneToOne: false
 "admin_servidor_segredo":
 { Args: { "p_segredo": string }; Returns: undefined
                            },
+"admin_situacao":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
 "admin_status_em":
 { Args: { "p_petshop": string,"p_quando": string }; Returns: Database["public"]['Enums']["status_assinatura"]
                            },
@@ -3397,7 +3414,7 @@ isOneToOne: false
 { Args: { "p_token": string }; Returns: Json
                            },
 "boletim_autorizar":
-{ Args: { "p_escopo": string,"p_marcar": string,"p_token": string }; Returns: Json
+{ Args: { "p_escopo": string,"p_marcar": string,"p_segredo"?: string,"p_token": string }; Returns: Json
                            },
 "boletim_do_codigo":
 { Args: { "p_token": string }; Returns: {
@@ -4116,6 +4133,9 @@ isOneToOne: false
 "fotos_autorizacao_frear":
 { Args: { "p_chave": string,"p_limite": number }; Returns: undefined
                            },
+"freio_rede_passa":
+{ Args: { "p_chave": string,"p_janela": string,"p_limite": number }; Returns: boolean
+                           },
 "fuso_da_uf":
 { Args: { "p_uf": string }; Returns: string
                            },
@@ -4204,10 +4224,22 @@ isOneToOne: false
 "hotel_previsto":
 { Args: { "p_estadia": string }; Returns: number
                            },
+"ia_dono_confirmado":
+{ Args: { "p_petshop": string }; Returns: boolean
+                           },
+"ia_teste_recusa":
+{ Args: { "p_canal": string,"p_petshop": string,"p_quanto"?: number }; Returns: string
+                           },
 "ia_teto_geral":
 { Args: { "p_canal": string }; Returns: number
                            },
+"ia_teto_teste":
+{ Args: { "p_canal": string }; Returns: number
+                           },
 "ia_uso_geral":
+{ Args: { "p_canal": string }; Returns: number
+                           },
+"ia_uso_teste":
 { Args: { "p_canal": string }; Returns: number
                            },
 "imp_chave_nome":
@@ -4321,6 +4353,9 @@ isOneToOne: false
 "link_fone_chave":
 { Args: { "p_fone": string }; Returns: string
                            },
+"link_freio_anonimo":
+{ Args: { "p_loja": string,"p_padrao": number,"p_tipo": string }; Returns: undefined
+                           },
 "link_google":
 { Args: { "p_codigo": string }; Returns: string
                            },
@@ -4337,7 +4372,7 @@ isOneToOne: false
 { Args: { "p_codigo": string }; Returns: Json
                            },
 "link_ia_contar":
-{ Args: { "p_codigo": string,"p_segredo"?: string }; Returns: Json
+{ Args: { "p_codigo": string,"p_rede"?: string,"p_segredo"?: string }; Returns: Json
                            },
 "link_ia_ligada":
 { Args: { "p_codigo": string }; Returns: boolean
@@ -4580,6 +4615,9 @@ isOneToOne: false
 "pet_e_dia":
 { Args: { "p_inicio": string,"p_pet": string,"p_petshop": string }; Returns: string
                            },
+"pets_eh_logo":
+{ Args: { "p_nome": string }; Returns: boolean
+                           },
 "petshop_diarias":
 { Args: { "p": string }; Returns: {
               "diaria_creche": number,"diaria_hotel": number,"id": string
@@ -4731,6 +4769,9 @@ isOneToOne: false
         isOneToOne: false
         isSetofReturn: true
       } },
+"rede_chave":
+{ Args: { "p_ip": string }; Returns: string
+                           },
 "rede_ip":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
@@ -4784,6 +4825,9 @@ isOneToOne: false
                            },
 "servidor_segredo_registrar":
 { Args: { "p_segredo": string }; Returns: undefined
+                           },
+"sessao_forte":
+{ Args: Record<PropertyKey, never>; Returns: boolean
                            },
 "sou_admin":
 { Args: Record<PropertyKey, never>; Returns: boolean
@@ -4862,7 +4906,13 @@ isOneToOne: false
 "tutor_pagina_ligada":
 { Args: { "p": string }; Returns: boolean
                            },
+"tutor_pet_foto":
+{ Args: { "p_pet": string,"p_token": string }; Returns: Json
+                           },
 "tutor_ve_foto":
+{ Args: { "p_nome": string }; Returns: boolean
+                           },
+"tutor_ve_foto_pet":
 { Args: { "p_nome": string }; Returns: boolean
                            },
 "tutores_dinheiro":

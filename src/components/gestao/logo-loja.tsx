@@ -1,4 +1,4 @@
-import { fotoPet } from "@/lib/gestao/supabase-config";
+import { logoDaLoja } from "@/lib/gestao/supabase-config";
 import { iniciais } from "@/lib/gestao/util";
 import { Selo } from "./marca";
 
@@ -6,7 +6,7 @@ import { Selo } from "./marca";
 export default function LogoLoja({ nome, logo, tamanho = 40, padrao = "iniciais", tomSelo }: {
   nome: string; logo?: string | null; tamanho?: number; padrao?: "iniciais" | "selo"; tomSelo?: "claro" | "verde" | "suave";
 }) {
-  const url = fotoPet(logo);
+  const url = logoDaLoja(logo);
   if (!url && padrao === "selo") return <Selo tamanho={tamanho} tom={tomSelo} />;
   const letras = iniciais(nome);
   return (

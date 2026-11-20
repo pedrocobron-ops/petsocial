@@ -3,8 +3,8 @@ import type { Database } from "./banco";
 
 import { SUPABASE_CHAVE, SUPABASE_URL } from "./supabase-config";
 
-// endereço, chave pública e foto do pet moram em supabase-config.ts (sem a biblioteca do Supabase, para as páginas públicas)
-export { SUPABASE_CHAVE, SUPABASE_URL, configurado, fotoPet } from "./supabase-config";
+// endereço, chave pública e a logo do pet shop moram em supabase-config.ts (sem a biblioteca do Supabase, para as páginas públicas)
+export { SUPABASE_CHAVE, SUPABASE_URL, configurado, logoDaLoja } from "./supabase-config";
 
 export type Banco = SupabaseClient<Database>;
 

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { fotoPet } from "./supabase-config";
+import { logoDaLoja } from "./supabase-config";
 
 /**
  * A prévia do link no WhatsApp (Open Graph) das páginas que o tutor recebe: o nome do pet shop, uma frase curta e a logo
@@ -23,7 +23,7 @@ const curto = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).rep
  * `particular`: página com código particular (pedido, página do tutor): fica fora dos buscadores e sem guardar em cache.
  */
 export function previaDaLoja(o: { titulo: string; descricao: string; loja: string; logo?: string | null; url: string; origem: string; imagemNeutra: string; particular?: boolean }): Metadata {
-  const logo = fotoPet(o.logo);
+  const logo = logoDaLoja(o.logo, o.origem);
   const imagem = logo ? { url: logo, width: 512, height: 512, alt: `Logo de ${o.loja}` } : { url: `${o.origem}${o.imagemNeutra}`, width: 1200, height: 630, alt: o.loja };
   const titulo = curto(o.titulo, 90), descricao = curto(o.descricao, 180);
   return {

@@ -76,4 +76,39 @@ async function servidorNoAr() {
  */
 const dadosDoCadastro = () => ({ data: { app: 'maestro', aceite: require('./app').lib('documentos').aceiteDoCadastro() } });
 
-module.exports = { RAIZ, dadosDoCadastro, ENV, SUPABASE_URL, SUPABASE_KEY, BASE_URL, DB_CONTAINER, cliente, sql, num, q, must, uuid, sufixo, ipAleatorio, centavos, hojeNo, somaDias, diaDaSemana, proximoDia, instante, servidorNoAr };
+/* ---------- segundo fator do administrador (TOTP, migração 20261245) ---------- */
+/** Código TOTP de 6 números (RFC 6238, SHA-1, 30 s) a partir do segredo em base32 que o Supabase Auth devolve. */
+function totp(segredo, quando = Date.now()) {
+  const alfa = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = '';
+  for (const c of String(segredo).replace(/=+$/, '').toUpperCase().replace(/\s/g, '')) { const v = alfa.indexOf(c); if (v >= 0) bits += v.toString(2).padStart(5, '0'); }
+  const chave = Buffer.from((bits.match(/.{8}/g) ?? []).map((b) => parseInt(b, 2)));
+  const passo = Buffer.alloc(8); passo.writeBigUInt64BE(BigInt(Math.floor(quando / 30000)));
+  const h = crypto.createHmac('sha1', chave).update(passo).digest();
+  const o = h[h.length - 1] & 0xf;
+  return String(((h.readUInt32BE(o) & 0x7fffffff) % 1e6)).padStart(6, '0');
+}
+/** Segredos TOTP cadastrados nesta execução, por usuário (o navegador usa para passar da tela do código). */
+const segredosMfa = new Map();
+/**
+ * Sessão forte de administrador (aal2) num cliente já logado: cadastra um fator TOTP (ou usa o desta execução) e confere um
+ * código. Devolve o segredo. Precisa do TOTP ligado no Auth local ([auth.mfa.totp] no supabase/config.toml).
+ */
+async function adminForte(sb) {
+  const uid = (await sb.auth.getUser()).data.user?.id;
+  if (!uid) throw new Error('adminForte: cliente sem login');
+  let fator = null, segredo = segredosMfa.get(uid);
+  const f = must(await sb.auth.mfa.listFactors(), 'fatores');
+  const pronto = f.totp.find((x) => x.status === 'verified');
+  if (pronto && segredo) fator = pronto.id;
+  else {
+    for (const x of f.all) if (x.factor_type === 'totp') await sb.auth.mfa.unenroll({ factorId: x.id });
+    const e = must(await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName: `teste ${sufixo()}` }), 'cadastro do fator (TOTP ligado no Auth local?)');
+    fator = e.id; segredo = e.totp.secret;
+    segredosMfa.set(uid, segredo);
+  }
+  must(await sb.auth.mfa.challengeAndVerify({ factorId: fator, code: totp(segredo) }), 'código do fator');
+  return segredo;
+}
+
+module.exports = { totp, segredosMfa, adminForte, RAIZ, dadosDoCadastro, ENV, SUPABASE_URL, SUPABASE_KEY, BASE_URL, DB_CONTAINER, cliente, sql, num, q, must, uuid, sufixo, ipAleatorio, centavos, hojeNo, somaDias, diaDaSemana, proximoDia, instante, servidorNoAr };

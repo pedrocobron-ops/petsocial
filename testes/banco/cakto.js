@@ -35,6 +35,7 @@ const PRECOS = { solo: [79, 215, 399], equipe: [129, 349, 659], petshop: [179, 4
   B.must(await adm.auth.signUp({ email: `t-${comum.suf}.admin@teste-auto.local`, password: comum.senha, options: B.dadosDoCadastro() }), 'admin');
   const uidAdm = (await adm.auth.getUser()).data.user.id;
   B.sql(`insert into admins (user_id) values ('${uidAdm}') on conflict do nothing`);
+  await B.adminForte(adm); // o painel só responde com o segundo fator (aal2, migração 20261245)
   T.depois(() => B.sql(`delete from admins where user_id='${uidAdm}'`));
   const pagou = (q) => `pagou.${q}.${suf}@teste-auto.local`;
   T.depois(() => B.sql(`delete from cakto_eventos where email like '%${suf}%'; delete from escola_compras where email like '%${suf}%'`));
