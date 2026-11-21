@@ -9,6 +9,9 @@ de datas fixas nem do dia da semana: as datas saem de "hoje" no fuso da loja e a
 ```bash
 # 1. Supabase local no ar, com todas as migrações (supabase/migrations) aplicadas
 npx supabase start            # contêiner supabase_db_petsocial; o .env.local aponta para ele
+#    O segundo fator (TOTP) precisa estar ligado no Auth local ([auth.mfa.totp] em supabase/config.toml, desde 20261245): sem ele, os
+#    testes do painel do administrador (B.adminForte, N.passarDoSegundoFator) quebram no cadastro do fator. Mudou o config.toml?
+#    `npx supabase stop && npx supabase start` (o Auth só lê na subida).
 
 # 2. Build e servidor (outra aba). GESTAO_LINK_IA_FALSO=1: o "Tirar dúvidas do link" responde sem chamar o modelo.
 #    GESTAO_ERRO_TESTE=1: liga o gatilho de erro de propósito (tela Hoje com ?__erro_teste=…, rota /api/gestao/erro-teste).
@@ -64,6 +67,7 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `loja-negocios-site.js`: os 6 manuais pagos da linha de negócios (os mesmos produtos da Cakto que os materiais pagos da Escola) fora do site com `MATERIAIS_PAGOS_A_VENDA` desligado (`foraDoSite`, `noSite`, `manuaisNoSite`, `lojaNegociosNoSite` em `produtos.ts`): vitrine vazia, nenhuma indicação de manual, sitemap sem /negocios; os guias para tutores continuam; ligada, os 6 voltam. As telas (página de venda com 404, /negocios levando à página inicial, topo, rodapé, página inicial, Quem faz, termos) leem a mesma chave. Sem banco.
 - `abertura-admin-escola.js`: a abertura tenta mais uma vez, quieta, quando o banco demora ou a rede pisca (`abertura.ts`: `comUmaTentativaAMais`, `erroPassageiro`; sem permissão ou PGRST116 não repete; tela fechada não repete); `lerBase` com o banco demorando sobe o erro sem ler em pedaços; aviso de demora aos 12 s; nenhum `.single()` na abertura; materiais pagos da Escola fora da estante e do manual com `MATERIAIS_PAGOS_A_VENDA` desligado (`escola-venda.ts`), e de volta com ela ligada. Sem banco.
 - `link-tutor.js`: rodada 9 (N7), o que o tutor vê: valor por pet e total (`link-precos.ts`: porte P e porte G com 15% = 42,41 + 76,41 = 118,82, faixa sem porte, o que o banco guardou), endereço e link do mapa (`endereco.ts`), "Adicionar à agenda" (`ics.ts`), Tirar dúvida com promoções, endereço e resposta pela metade (`link-ia.ts`), abertura do link numa ida só também pelo navegador (`link-inicial.ts`) e a confirmação com o endereço.
+- `seguranca-reforcos.js` (migração 20261245): a regra de conteúdo que VALE no aplicativo e no painel (`csp.ts`: script só do site e com o nonce da página, `script-src-attr 'none'`, sem `'unsafe-inline'` no script, sem pixel nem Cakto, Supabase em https e wss; nonce novo a cada vez); só `/gestao/app` e `/gestao/admin` têm a regra (middleware) e o `next.config.ts` não manda a "só avisando" para elas; quem abriu a página fora do aplicativo recarrega ao entrar (`precisaRecarregar`); os scripts em linha da abertura com o nonce; o leitor de PDF sem testar `eval`; a logo pela rota `/gestao/marca/…` (`logoDaLoja`, só caminho de logo) e ninguém montando o endereço público do bucket `pets`; o painel pergunta `admin_situacao` e mostra o segundo fator (Supabase Auth MFA); TOTP ligado no `config.toml`.
 - `seguranca-rodada9.js`: célula de planilha segura (`celulaCsv` em `csv.ts`: fórmula vira texto) e o uso dela na exportação dos aceites; `next.config.ts` com os cabeçalhos de segurança em todas as páginas; **`npm audit --omit=dev --audit-level=high`** sem alerta alto ou crítico (sem internet vira problema conhecido, não derruba).
 - `caixa-trava-recibos.js`: rodada 9 (N5): comprovante do hotel com o sinal recebido na saída (110,40 + 282,60 = 393,00 = Crédito 2x 200,00 + Pix 193,00; `totalPagoAgora`, `fechoDaConta`), parcelas, troco, hora e quem atendeu nos comprovantes (`formasComValor`, `linhaDeQuem`), comprovante da conta para depois (`textoComprovanteAReceber`), recibo da conta paga (`textoReciboDeConta`: 15,00 + 0,34 = 15,34), troca e devolução (`textoComprovanteDevolucao`: 29,99 por 34,90, diferença 4,91), frases do fiado (`fraseDoLimite`, `fraseDoQueDeve`), Caixa no menu no modo simples e "Conta anterior" na cobrança.
 - `equipe-chao.js`: rodada 9 (N6), a equipe do chão e os cuidados do hotel: dose na hora, atrasada ou depois (`situacaoDaDose`, `dosesDeAgora`), ficha de cuidados e ocorrências ligadas por padrão (`hotel.sem_cuidados`, `casa.sem_ocorrencias`), texto livre que fala de remédio (`falaDeRemedio`), atalhos de chegada que entram no Conferir a entrada (`entradaPelosAtalhos`), ordem do Meus pets de hoje, alerta curto, "Cannot coerce…" em português e as áreas das ferramentas do Mozart do chão.
@@ -193,6 +197,22 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   de A; nada pode trazer a marca posta nos dados de A (nome, e-mail, endereço, R$ 7.777,77) e o retrato dos dados de A tem de
   ficar igual. Anônimo que lê qualquer linha de qualquer tabela derruba o teste (catálogo público de propósito entra em `PUBLICAS`).
   Ficam fora da chamada (lista `PULA`): funções que apagam a conta de quem chama, criam loja, do painel e as que só contam uso.
+- `seguranca-reforcos.js` (migração 20261245; precisa do servidor e do TOTP ligado no Auth local): painel do administrador com o
+  segundo fator (com a senha só, aal1: `sou_admin()` false, todas as `admin_*` recusadas e a rota da cópia completa 403;
+  `admin_situacao` diz admin e não forte; com o fator TOTP cadastrado e um código conferido — gerado no teste pelo segredo, `B.totp` —
+  a sessão vira aal2 e tudo responde; outro aparelho com a senha certa é recusado até o código; código errado não passa; nenhuma
+  função fora do painel usa `sou_admin()`); IA do teste grátis (teto próprio dos pet shops em teste, um quarto do geral: Mozart,
+  Ajuda, boletim e caderno param com "geral" e o pet shop que paga continua; dono sem o e-mail confirmado: "email", nada contado;
+  provado, volta; pagando, não depende); IP dos aceites (`boletim_autorizar` sem o segredo ignora `x-maestro-ip`/`-navegador`
+  forjados e grava o IP que o banco vê; pela rota do servidor com a trava, o IP e o navegador do tutor; `aceitar_documentos` grava o
+  `cf-connecting-ip`, não o `x-forwarded-for`); freio por rede no banco (Tirar dúvida: com `link_ia_rede_hora` 3, a 4ª pergunta da
+  mesma rede fica no limite e não gasta a cota; outra rede pergunta; IPv6 pelo /64; chamar direto com rede inventada e sem segredo é
+  recusado; `link_horarios`, `link_hotel_estimativa` e `link_estadia_cheios` com o limite baixado: a consulta a mais é 429, outra
+  rede e a equipe passam; só o hash da rede é guardado); bucket `pets` privado (endereço público não abre; a equipe assina; anônimo e
+  outro pet shop não; Estoque não manda nem apaga, a recepção sim; a logo abre por `/gestao/marca/…` e a foto do pet não; o boletim
+  mostra a logo pela rota; a página do tutor mostra a foto do pet pela rota `/gestao/tutor/<código>/pet/<id>`, que abre para o
+  tutor dono e dá 404 para outro); chaves compostas (`lancamentos.conta_id`, `devolucao_de`, `multa_de` e `diario_fotos.pet_id` de
+  outro pet shop recusados pela chave; do mesmo pet shop, entram).
 - `seguranca-rodada9.js` (migração 20261228; a parte dos cabeçalhos e da rota do Mozart precisa do servidor, de preferência com
   `GESTAO_MOZART_FALSO=1`): teto geral da IA por dia (Mozart, Ajuda, boletim, Tirar dúvida: o que passa do teto volta "geral"),
   conta só para consulta sem IA ("fechado"; a rota responde 403 `so_consulta` com frase simples), teto menor no teste grátis;
@@ -593,6 +613,14 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 **telas/** (Playwright, Chromium)
 - `loja-negocios-site.js`: manuais de negócio fora do site: /negocios leva à página inicial, as 6 páginas de venda dão 404 e saem do sitemap; nenhum link para /negocios no topo, menu do celular, rodapé (sem a coluna Manuais), página inicial (duas portas: /tutor e /gestao), Quem faz, termos, /tutor e página de guia; guias e /gestao no ar. 390 e 1366, capturas em `testes/saida/loja-negocios-*.png`.
 - `abertura-admin-escola.js`: abertura com a primeira resposta da conta ou do pet shop cortada por demora (ou rede caindo): o aplicativo abre sozinho, sem "Opa, algo não carregou" nem "Ainda buscando…"; falhando sempre, a tela de erro com "Tentar de novo" (duas tentativas, não mais). Painel do administrador: o primeiro quadro depois de tocar uma aba já é a aba nova carregando, nunca o conteúdo da anterior. Conta de teste marcada e desmarcada na folha do pet shop (sai de "Todos" e dos números). Escola sem material pago para o cliente (sem preço, "Comprar" nem "em breve") e o painel com "Escondido da loja até ter PDF e o aviso de pagamento". 390 e 1366.
+- `seguranca-reforcos.js` (migração 20261245, 390 e 1366): painel do administrador sem fator mostra o QR code (data:) e o código de
+  texto; código errado avisa "não confere"; o código certo (gerado pelo segredo lido da tela) abre o painel e o fator fica conferido no
+  Auth; outro aparelho com a senha certa pede o código (sessão aal1) antes do painel. O painel e o aplicativo mandam a regra de
+  conteúdo que vale (nonce novo a cada página, sem `'unsafe-inline'` no script, sem a "só avisando") e **nenhum `securitypolicyviolation`**
+  no painel (as 10 abas) e em 17 telas do aplicativo nas duas larguras; controle: um script em linha sem nonce e um `onerror=""` não
+  rodam e o vigia vê as violações. A foto do pet aparece na ficha pelo endereço assinado do Supabase. Da capa com os cookies aceitos (o
+  fbevents.js carregado, com a Meta simulada) para o aplicativo pelo roteador do Next: a página recarrega no endereço do aplicativo,
+  sem fbevents.js, sem `fbq` e sem pedido para a Meta.
 - `seguranca-rodada9.js` (390 e 1366): com os cabeçalhos novos, o site de vendas, a entrada, o cadastro, o link do cliente e as telas do aplicativo abrem sem erro, sem rolagem lateral e **sem nenhum aviso "[Report Only]"** da lista de carregamento (Supabase, fotos, fontes); o Manual tem "O Mozart tem limite de uso?"; no painel do administrador (aba Cakto), o cartão Trava do servidor e o Teto de uso da inteligência artificial hoje.
 - `dinheiro-n4.js`: rodada 9 (N4) com a dona: Financeiro com Faturamento − Despesas = Resultado e "Como os números se ligam" (9 passos), as quatro planilhas de Para o contador e o Exportar somando o Resultado da tela; Relatórios e Indicadores com o mesmo Valor médio por conta; a opção do feriado no repasse; Hoje ("Faturamento de hoje"), Caixa ("Recebido hoje") e a retirada do dono pelo Caixa virando despesa; aparelho em Tóquio.
 - `caixa-trava-recibos.js`: rodada 9 (N5) com a recepção e o preço travado (10%): check-out da creche abaixo da conta com o botão apagado e o menor valor na folha (R$ 63,00), comprovante com "Dinheiro R$ 63,00" e quem recebeu; desconto acima do máximo ("Desconto acima do permitido", total de R$ 63,00); Faltou com a taxa num aviso só e gravada mesmo recarregando; venda no balcão com "Ana deve R$ 119,80 · … cabe mais R$ 30,20" e a recusa do limite escrita na venda; entrada recebida sem Excluir e com Devolver ao cliente (comprovante da devolução); 1366: Caixa depois de uma troca conta só o dinheiro (Entrou hoje R$ 147,90) e Alterações mostra o check-out abaixo da conta e as devoluções. Capturas em `testes/saida/caixa-trava-*.png`.
@@ -879,7 +907,24 @@ freios antigos, reservas do caderno) também roda pelo pg_cron (`gestao-faxina-d
 Para testar a rota à mão: `curl -H "x-gestao-faxina: <segredo>" https://…/api/gestao/faxina` (devolve só quantidades).
 A mesma faxina apaga as contas com o prazo de "Encerrar e apagar a conta" vencido (pet shop, arquivos e os logins do Maestro que
 ficaram sem pet shop) e os arquivos da fila da LGPD. A **cópia completa** do painel do administrador (`/api/gestao/admin/copia`)
-também usa `SUPABASE_SERVICE_ROLE_KEY` (sem ela, 503); só passa quem `sou_admin` diz que é admin.
+também usa `SUPABASE_SERVICE_ROLE_KEY` (sem ela, 503); só passa quem `sou_admin` diz que é admin (com o segundo fator, abaixo).
+
+**Segundo fator do administrador (migração 20261245).** `sou_admin()` só diz sim com a sessão aal2 (código do aplicativo
+autenticador): todas as `admin_*`, as regras da Escola e a cópia completa dependem dela. No primeiro acesso a `/gestao/admin`, a tela
+mostra o QR code e o código de texto para cadastrar no Google Authenticator (ou outro) e pede o primeiro código; depois, pede o código
+a cada sessão nova. O cadastro e a conferência são do Supabase Auth: ligue o TOTP no painel do Supabase (Authentication →
+Multi-Factor → TOTP, normalmente já ligado no Supabase da nuvem). Perdeu o celular: alguém com acesso ao banco apaga o fator
+(`delete from auth.mfa_factors where user_id = (select id from auth.users where email = '<e-mail do admin>');`) e a pessoa cadastra
+de novo na próxima entrada no painel.
+
+**IA no teste grátis (migração 20261245).** Os pet shops em teste têm um teto geral próprio por dia, para não esgotar o de quem
+paga: `mozart_dia_geral_teste`, `ajuda_dia_geral_teste`, `boletim_dia_geral_teste`, `link_ia_dia_geral_teste`,
+`caderno_dia_geral_teste` (sem a linha: um quarto do teto geral do canal). E o e-mail do dono precisa estar confirmado (pelo link do
+cadastro com "Confirm email" ligado, ou provado por código / link de senha); sem isso a IA responde que falta confirmar o e-mail.
+
+**Freio por rede do link (migração 20261245).** Guardado no banco (vale em todas as instâncias): `link_ia_rede_hora` 20 e
+`link_ia_rede_dia` 40 perguntas do Tirar dúvida por rede em cada pet shop; `link_freio_horarios_hora`,
+`link_freio_hotel_estimativa_hora` e `link_freio_estadia_cheios_hora` 600 consultas anônimas por hora por rede em cada pet shop.
 
 **Trava do servidor (migração 20261228).** O Tirar dúvida do link, o chat da página de vendas e o IP do aceite da entrada
 dependem de o banco conhecer o segredo do servidor (`GESTAO_SEGREDO_SERVIDOR`, 32+ caracteres; sem ela, o segredo é derivado
@@ -904,8 +949,9 @@ Além disso, ponha um limite mensal de gasto na chave da Anthropic (console da A
 é o Supabase Auth: mude no painel do Supabase, Authentication → Policies (ou Providers → Email) → Minimum password length = 8,
 e ligue "Prevent use of leaked passwords" se o plano tiver. O projeto é dividido com o Escala CEO: vale para os dois.
 
-**Cabeçalhos de segurança** (`next.config.ts`, `cabecalhosDeSeguranca`): valem em todas as páginas. A lista do que a página pode
-carregar está em modo "só avisando" (`Content-Security-Policy-Report-Only`); os avisos caem em `/api/gestao/csp` e aparecem nos
+**Cabeçalhos de segurança** (`next.config.ts`, `cabecalhosDeSeguranca`): valem em todas as páginas. No aplicativo e no painel do
+administrador a lista do que a página pode carregar VALE (`src/middleware.ts` e `src/lib/gestao/csp.ts`, com nonce; o teste
+`telas/seguranca-reforcos.js` acusa qualquer violação). Nas outras páginas, a lista está em modo "só avisando" (`Content-Security-Policy-Report-Only`); os avisos caem em `/api/gestao/csp` e aparecem nos
 logs da Vercel como `[csp] …`. Depois de alguns dias sem aviso legítimo, troque o nome do cabeçalho para `Content-Security-Policy`.
 Script, imagem ou serviço novo de fora? Ponha o endereço na lista (o teste `telas/seguranca-rodada9.js` acusa aviso nas telas).
 
