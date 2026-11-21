@@ -17,7 +17,9 @@ function versao(): string {
  * - Valendo já: o site não abre dentro de página de outro site (X-Frame-Options + frame-ancestors), o navegador não
  *   adivinha tipo de arquivo (nosniff), o endereço completo não vaza para outros sites (Referrer-Policy; as páginas
  *   públicas levam código no endereço) e só o próprio site usa câmera e microfone (fotos e o Mozart por voz).
- * - Só avisando (Content-Security-Policy-Report-Only): a lista do que cada página pode carregar. Nada é bloqueado ainda;
+ * - No aplicativo (/gestao/app) e no painel (/gestao/admin) a regra de conteúdo VALE, com nonce por página e sem script em
+ *   linha (src/middleware.ts, src/lib/gestao/csp.ts); a daqui não vai para eles.
+ * - Só avisando (Content-Security-Policy-Report-Only), nas outras páginas: a lista do que cada página pode carregar. Nada é bloqueado ainda;
  *   o navegador manda um aviso para /api/gestao/csp quando algo sai da lista. Depois de alguns dias sem aviso legítimo,
  *   troque `Content-Security-Policy-Report-Only` por `Content-Security-Policy` (e junte o frame-ancestors na mesma linha).
  * De fora que o site usa: Supabase (dados, fotos e tempo real), o pixel da Meta (só depois do aceite dos cookies) e o
@@ -67,8 +69,11 @@ const nextConfig: NextConfig = {
     // delas: nenhum endereço vai para fora (no-referrer). As outras mandam só o domínio. Duas regras que não se cruzam.
     const COM_CODIGO = "tutor|entrada|album|boletim|orcamento|autorizacao";
     const todos = cabecalhosDeSeguranca();
+    const ehCsp = (h: { key: string }) => h.key.startsWith("Content-Security-Policy");
     return [
-      { source: "/:path*", headers: todos.filter((h) => h.key !== "Referrer-Policy") },
+      { source: "/:path*", headers: todos.filter((h) => h.key !== "Referrer-Policy" && !ehCsp(h)) },
+      // o aplicativo e o painel do administrador têm a regra que VALE, com nonce (src/middleware.ts e src/lib/gestao/csp.ts)
+      { source: "/((?!gestao/app(?:/|$)|gestao/admin(?:/|$)).*)", headers: todos.filter(ehCsp) },
       { source: `/((?!${COM_CODIGO.split("|").map((a) => `gestao/${a}/`).join("|")}).*)`, headers: todos.filter((h) => h.key === "Referrer-Policy") },
       { source: `/gestao/:area(${COM_CODIGO})/:resto*`, headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
     ];

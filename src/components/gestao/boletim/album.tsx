@@ -4,7 +4,7 @@ import { useState } from "react";
 import { BedDouble, Copy, Images, Link2, MessageCircle, Scissors, Sun, Trash2 } from "lucide-react";
 import { BUCKET_BOLETIM, doPet, seloDoBanho, type Sexo } from "@/lib/gestao/boletim";
 import { nomeDosServicos } from "@/lib/gestao/servicos-do-horario";
-import { fotoPet } from "@/lib/gestao/supabase";
+import { BUCKET_PETS } from "@/lib/gestao/fotos-pets";
 import { usaModulo } from "@/lib/gestao/modulos";
 import { BUCKET_DIARIO } from "@/lib/gestao/tutor";
 import { chamar, dataLonga, isoDia, linkWhatsApp } from "@/lib/gestao/util";
@@ -72,11 +72,18 @@ export default function AlbumDoPet({ pet, tutor }: { pet: { id: string; nome: st
       for (const x of s.data ?? []) if (x.path && x.signedUrl) urlsDiario.set(x.path, x.signedUrl);
     }
     const mapa = new Map<string, VisitaDoAlbum>();
-    // antes e depois do banho (bucket de fotos do pet)
-    for (const x of (ok(a) ?? []) as unknown as ({ id: string; inicio: string; foto_antes: string | null; foto_depois: string | null } & ComServicosDoAlbum)[]) {
+    // antes e depois do banho (bucket de fotos do pet, privado: endereço assinado)
+    const doBanho = (ok(a) ?? []) as unknown as ({ id: string; inicio: string; foto_antes: string | null; foto_depois: string | null } & ComServicosDoAlbum)[];
+    const caminhosDoBanho = doBanho.flatMap((x) => [x.foto_antes, x.foto_depois]).filter((c): c is string => Boolean(c));
+    const urlsBanho = new Map<string, string>();
+    for (let i = 0; i < caminhosDoBanho.length; i += 100) {
+      const s = await sb.storage.from(BUCKET_PETS).createSignedUrls(caminhosDoBanho.slice(i, i + 100), 3600);
+      for (const x of s.data ?? []) if (x.path && x.signedUrl) urlsBanho.set(x.path, x.signedUrl);
+    }
+    for (const x of doBanho) {
       const v: VisitaDoAlbum = { chave: `a:${x.id}`, quando: x.inicio, tipo: "banho", fotos: [], servicos: nomesDoHorario(x) };
-      if (x.foto_antes) v.fotos.push({ url: fotoPet(x.foto_antes)!, rotulo: "Antes" });
-      if (x.foto_depois) v.fotos.push({ url: fotoPet(x.foto_depois)!, rotulo: "Depois" });
+      if (x.foto_antes && urlsBanho.get(x.foto_antes)) v.fotos.push({ url: urlsBanho.get(x.foto_antes)!, rotulo: "Antes" });
+      if (x.foto_depois && urlsBanho.get(x.foto_depois)) v.fotos.push({ url: urlsBanho.get(x.foto_depois)!, rotulo: "Depois" });
       mapa.set(v.chave, v);
     }
     for (const x of boletins) {

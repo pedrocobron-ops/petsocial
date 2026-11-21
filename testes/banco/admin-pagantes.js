@@ -14,6 +14,7 @@ const T = require('../lib/teste')('admin-pagantes');
   B.must(await adm.auth.signUp({ email: emailAdm, password: SENHA, options: B.dadosDoCadastro() }), 'cadastro do admin');
   const uid = (await adm.auth.getUser()).data.user.id;
   B.sql(`insert into admins (user_id) values ('${uid}') on conflict do nothing`); // só por SQL: ninguém vira admin pela API
+  await B.adminForte(adm); // o painel só responde com o segundo fator (aal2, migração 20261245)
   T.depois(() => B.sql(`delete from admins where user_id='${uid}'; delete from auth.users where id='${uid}'`));
   // os passos são globais: guarda como estavam e devolve no fim
   const passosAntes = B.sql(`select coalesce(json_agg(json_build_object('passo', passo, 'feito_em', feito_em, 'feito_por', feito_por)), '[]') from admin_empresa_passos`);

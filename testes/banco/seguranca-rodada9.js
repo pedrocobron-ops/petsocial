@@ -37,6 +37,8 @@ const config = (chave, valorSql) => `insert into public.config_interna (chave, v
   T.secao('H2: teto geral da IA (todos os pet shops juntos)');
   let r = ensaio(`
     ${config('mozart_dia_geral', "(public.ia_uso_geral('mozart') + 3)::text")}
+    ${config('mozart_dia_geral_teste', "'999999'")} -- o teto próprio do teste grátis (20261245) fora desta conta
+    ${config('ajuda_dia_geral_teste', "'999999'")}
     ${como(uidA)}
     select 'R1=' || (public.assistente_contar_v2('${A.P}', 'mozart', 'chamada', 600) ->> 'ok');
     select 'R2=' || (public.assistente_contar_v2('${A.P}', 'mozart', 'chamada', 600) ->> 'ok');
@@ -55,6 +57,9 @@ const config = (chave, valorSql) => `insert into public.config_interna (chave, v
     ${config('ajuda_dia_geral', "(public.ia_uso_geral('ajuda') + 1)::text")}
     ${config('boletim_dia_geral', "(public.ia_uso_geral('boletim') + 1)::text")}
     ${config('link_ia_dia_geral', "(public.ia_uso_geral('link_ia') + 1)::text")}
+    ${config('ajuda_dia_geral_teste', "'999999'")} -- o teto próprio do teste grátis (20261245) fora desta conta
+    ${config('boletim_dia_geral_teste', "'999999'")}
+    ${config('link_ia_dia_geral_teste', "'999999'")}
     delete from public.config_interna where chave = 'servidor_segredo_sha256';
     ${config('servidor_trava_carencia_ate', "(now() + interval '1 day')::text")}
     update public.petshops set link_ativo = true, opcoes = coalesce(opcoes, '{}'::jsonb) || '{"link.ia": true}'::jsonb where id = '${A.P}';

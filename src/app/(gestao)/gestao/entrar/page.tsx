@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Porta from "@/components/gestao/porta";
 import { banco, configurado } from "@/lib/gestao/supabase";
 import { registrarAcesso } from "@/lib/gestao/registro-acesso";
@@ -23,7 +23,6 @@ function ComConvite() {
 }
 
 function Formulario({ codigo }: { codigo: string }) {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -43,7 +42,7 @@ function Formulario({ codigo }: { codigo: string }) {
       setErroConvite(a ? `${a.titulo}. ${a.texto}` : r.erro);
       return;
     }
-    router.replace("/gestao/app");
+    window.location.replace("/gestao/app");
   }
 
   // já logado (ou voltando do link de confirmação do e-mail): aceita o convite sem pedir a senha de novo
@@ -75,7 +74,7 @@ function Formulario({ codigo }: { codigo: string }) {
     registrarAcesso(banco(), "login", data.user?.id);
     if (codigo) { await usarConvite(); setIndo(false); return; }
     setIndo(false);
-    router.replace("/gestao/app");
+    window.location.replace("/gestao/app");
   }
 
   async function sair() {

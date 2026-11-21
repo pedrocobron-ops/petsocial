@@ -34,7 +34,7 @@ export default function Leitor({ slug, titulo, aoFechar }: { slug: string; titul
         if (baixado.error || !baixado.data) throw new Error("Não consegui abrir o material. Confira a internet e tente de novo.");
         const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
         pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/legacy/build/pdf.worker.min.mjs", import.meta.url).toString();
-        const d = (await pdfjs.getDocument({ data: await baixado.data.arrayBuffer() }).promise) as unknown as Documento;
+        const d = (await pdfjs.getDocument({ data: await baixado.data.arrayBuffer(), isEvalSupported: false }).promise) as unknown as Documento;
         aberto = d;
         if (!vale) { void d.destroy(); return; }
         setArquivo(baixado.data);

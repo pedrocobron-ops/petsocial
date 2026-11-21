@@ -7,7 +7,12 @@ export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 export const SUPABASE_CHAVE = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
 export const configurado = Boolean(SUPABASE_URL && SUPABASE_CHAVE);
 
-/** Endereço público da foto de um pet (o nome do arquivo é aleatório). */
-export function fotoPet(caminho: string | null | undefined): string | null {
-  return caminho ? `${SUPABASE_URL}/storage/v1/object/public/pets/${caminho}` : null;
+/**
+ * Endereço da logo do pet shop (no bucket `pets`, privado desde a migração 20261245): a rota /gestao/marca/<caminho> deste
+ * site busca o arquivo (só logo de pet shop: regra pets_logo_ler). As fotos dos pets vão por fotos-pets.ts (equipe) e pela
+ * página do tutor (/gestao/tutor/<código>/pet/<id>). `origem`: endereço completo, para a prévia do link no WhatsApp.
+ */
+export function logoDaLoja(caminho: string | null | undefined, origem = ""): string | null {
+  if (!caminho || !/^[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,120}$/.test(caminho)) return null;
+  return `${origem}/gestao/marca/${caminho}`;
 }

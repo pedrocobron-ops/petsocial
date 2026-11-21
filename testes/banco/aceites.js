@@ -62,6 +62,7 @@ const T = require('../lib/teste')('aceites');
   if (!(await adm.auth.getSession()).data.session) B.must(await adm.auth.signInWithPassword({ email: admEmail, password: SENHA }), 'login do admin');
   const uidAdm = (await adm.auth.getUser()).data.user.id;
   B.sql(`insert into admins (user_id) values ('${uidAdm}') on conflict do nothing`);
+  await B.adminForte(adm); // o painel só responde com o segundo fator (aal2, migração 20261245)
   T.depois(() => B.sql(`delete from admins where user_id='${uidAdm}'`));
   const painel = await adm.rpc('admin_aceites', { p_busca: `t-${L.suf}.`, p_limite: 50 });
   const lista = painel.data?.aceites ?? [];

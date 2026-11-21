@@ -5,7 +5,8 @@ import { Selo } from "./marca";
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { SELETOR_FOCAVEL, proximoNoTab, tempoDoAviso } from "@/lib/gestao/desenho";
 import { Cat, Dog, PawPrint, Search, X } from "lucide-react";
-import { fotoPet, ouvirGravacoes } from "@/lib/gestao/supabase";
+import { ouvirGravacoes } from "@/lib/gestao/supabase";
+import { useFotoPet } from "@/lib/gestao/fotos-pets";
 import type { PetComTutor } from "@/lib/gestao/tipos";
 import { corDoNome, iniciais, lerValorEstrito, semAcento, valor2 } from "@/lib/gestao/util";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
@@ -696,7 +697,7 @@ export function CampoValor({ valor, aoMudar, placeholder = "0,00", autoFocus, id
 }
 
 export function AvatarPet({ pet, tamanho }: { pet: { nome: string; foto?: string | null; especie?: string | null }; tamanho?: "p" | "g" | "gg" }) {
-  const url = fotoPet(pet.foto);
+  const url = useFotoPet(pet.foto);
   const Icone = pet.especie === "gato" ? Cat : pet.especie === "cao" ? Dog : PawPrint;
   return (
     <span className={`g-avatar${tamanho ? ` tam-${tamanho}` : ""}`} style={{ background: corDoNome(pet.nome) }} aria-hidden>
