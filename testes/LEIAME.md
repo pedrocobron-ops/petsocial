@@ -28,6 +28,11 @@ ANTHROPIC_API_KEY=sk-ant-chave-falsa GESTAO_LINK_IA_FALSO=1 GESTAO_ERRO_TESTE=1 
 #    de amanhã numa resposta (telas/mozart-automatico.js: no modo automático, os dois são feitos em ordem).
 npx next build
 ANTHROPIC_API_KEY=sk-ant-chave-falsa GESTAO_LINK_IA_FALSO=1 GESTAO_ERRO_TESTE=1 GESTAO_BOLETIM_FALSO=1 npx next start -p 3214
+#    GESTAO_RESUMO_FALSO=1: o texto do Mozart no Resumo do dia (rota /api/gestao/resumo-do-dia) sai de `respostaDeTeste`
+#    (resumo-do-dia.ts), sem chamar o modelo: a frase e a dica sem IA com a marca "Mozart de teste"; num pet shop com
+#    "IA inventa" no nome, um texto com número inventado (97), que a rota tem de descartar. Precisa dele: banco/resumo-do-dia.js
+#    e telas/resumo-do-dia.js. Todas juntas (é como a suíte inteira roda):
+ANTHROPIC_API_KEY=sk-ant-chave-falsa GESTAO_LINK_IA_FALSO=1 GESTAO_ERRO_TESTE=1 GESTAO_CADERNO_FALSO=1 GESTAO_BOLETIM_FALSO=1 GESTAO_MOZART_FALSO=1 GESTAO_RESUMO_FALSO=1 npx next start -p 3214
 
 # 3. Testes
 npm run test:unidade     # só os testes de unidade: sem banco e sem servidor (é o que o CI roda a cada pull request)
@@ -66,6 +71,15 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 ## O que cada suíte confere
 
 **unidade/**
+- `resumo-do-dia.js`: o Resumo do dia sem banco (`src/lib/gestao/resumo-do-dia.ts`): o dia começa às 05:00 no fuso do pet shop
+  (`diaDoResumo`: 04:59 ainda é ontem; Manaus); a saudação pela hora e o bloco da data; a frase sem IA ("Seu dia começa às 8h com o
+  Thor."); os três números só dos módulos que a pessoa vê ("atendimentos seus" para o tosador); os buracos (`buracosDoDia`: almoço,
+  a janela com o horário por serviço, bloqueio, só o que ainda vem, menos de 1 h não conta); a linha do tempo com o não confirmado e
+  "Mais N até as HH:MM"; a semana com o dia fraco em laranja e a frase ("Quinta está fraca: só 3 horários marcados."); as linhas do
+  dinheiro, com o previsto numa linha só e as origens em texto pequeno quando há mais de uma (`origensDoPrevisto`: "Agenda R$ 190,00 ·
+  Creche e hotel R$ 310,00 · A receber R$ 45,00"), também no texto de "Ouvir" e nos fatos da IA (só para quem tem área de dinheiro); cada dica escrita sem IA, sem promessa nem urgência, e o botão ("Chamar os 8 para quinta"); o texto de "Ouvir"; os fatos
+  que a IA recebe (sem dinheiro nem tutor) e `validarTextoDaIA`: número que não está nos fatos (em algarismo ou por extenso),
+  promessa, porcentagem, link, marcação ou dica com mais de 2 frases derrubam o texto. Sem banco.
 - `loja-negocios-site.js`: os 6 manuais pagos da linha de negócios (os mesmos produtos da Cakto que os materiais pagos da Escola) fora do site com `MATERIAIS_PAGOS_A_VENDA` desligado (`foraDoSite`, `noSite`, `manuaisNoSite`, `lojaNegociosNoSite` em `produtos.ts`): vitrine vazia, nenhuma indicação de manual, sitemap sem /negocios; os guias para tutores continuam; ligada, os 6 voltam. As telas (página de venda com 404, /negocios levando à página inicial, topo, rodapé, página inicial, Quem faz, termos) leem a mesma chave. Sem banco.
 - `abertura-admin-escola.js`: a abertura tenta mais uma vez, quieta, quando o banco demora ou a rede pisca (`abertura.ts`: `comUmaTentativaAMais`, `erroPassageiro`; sem permissão ou PGRST116 não repete; tela fechada não repete); `lerBase` com o banco demorando sobe o erro sem ler em pedaços; aviso de demora aos 12 s; nenhum `.single()` na abertura; materiais pagos da Escola fora da estante e do manual com `MATERIAIS_PAGOS_A_VENDA` desligado (`escola-venda.ts`), e de volta com ela ligada. Sem banco.
 - `link-tutor.js`: rodada 9 (N7), o que o tutor vê: valor por pet e total (`link-precos.ts`: porte P e porte G com 15% = 42,41 + 76,41 = 118,82, faixa sem porte, o que o banco guardou), endereço e link do mapa (`endereco.ts`), "Adicionar à agenda" (`ics.ts`), Tirar dúvida com promoções, endereço e resposta pela metade (`link-ia.ts`), abertura do link numa ida só também pelo navegador (`link-inicial.ts`) e a confirmação com o endereço.
@@ -160,7 +174,8 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   reserva: hotel de Thor, 19/11" vira "Sinal da reserva: hotel de Thor", "(parte)" fica); "Creche e hotel" como "Hotel" ou "Creche"
   pela entrada e pelo que o pet shop faz (`nomeDaCategoria`); o que é de cada pet (`lancamentoDoPet`: diária, sinal, devolução, sem
   pegar "Melissa" pela "Mel"); o Mozart num hotel só diz "Hotel".
-- `bom-dia.js`: o "Bom dia" do Mozart (`src/lib/gestao/bom-dia.ts`): no máximo 3 linhas na ordem dia (agenda, buraco livre, casa),
+- `bom-dia.js`: as linhas do "Bom dia" (`src/lib/gestao/bom-dia.ts`; o cartão da tela Hoje virou a folha do Resumo do dia, que usa
+  estas linhas em "vale lembrar": vacina, pacote, aniversário e validade): no máximo 3 linhas na ordem dia (agenda, buraco livre, casa),
   quem deve e vem hoje, vacina de quem vem, pacote no último uso, aniversário; sem `devem` (papel sem dinheiro) nada de R$; só
   "agenda livre" não vira cartão; buraco na agenda com almoço e funcionamento; a linha da validade (quem cuida do estoque:
   "Validade: 2 produtos vencidos na prateleira e 3 vencem em até 30 dias.") depois de quem deve e antes da vacina. E a prévia da autorização das fotos
@@ -189,6 +204,23 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   o que está só na tela comparado com o saldo de agora, e a planilha sem colunas de R$ para quem não vê o financeiro.
 
 **banco/** (API do Supabase com o login de cada papel, como o navegador faz; SQL só para preparar e conferir)
+- `resumo-do-dia.js` (migração 20261246; precisa do servidor com `GESTAO_RESUMO_FALSO=1`): `resumo_dia_em` (04:59 ainda é o dia
+  anterior, no fuso do pet shop); `gestao_resumo_do_dia` da dona (3 atendimentos, 1 sem confirmar, os horários em ordem, a janela
+  do dia 06:00 às 21:00 juntando o pet shop e o serviço com horário próprio, com o almoço; buracos 06:00-09:00, 13:00-14:00 e
+  15:00-21:00; bloqueio corta o buraco; dia fechado sem janela; a semana de 7 dias; creche e hotel; previsto R$ 260,00 (agenda 190 +
+  a diária de creche avulsa da Luna, 70; a reserva que só chega hoje não entra), a conta de luz de hoje e a Ana devendo R$ 35,00);
+  o previsto por origem: quem sai hoje do hotel pela conta da reserva (`hotel_previsto`, 2 noites de R$ 120 = 240), mensalista da
+  creche fora, sinal a receber da própria estadia sem contar duas vezes, sinal já recebido descontado (240 − 50), conta a receber que
+  vence hoje dentro (R$ 45), a do horário de hoje e a que vence amanhã fora, pet shop sem creche nem hotel sem a casa; a recepção vê o dinheiro do dia sem as contas a pagar; o tosador sem dinheiro e só com a
+  agenda dele (e os sem profissional); monitor só a casa; outra loja recebe vazio, não marca, não vota e não lê as tabelas; ninguém
+  grava direto; "já viu hoje" por pessoa (vale em outra sessão) e de novo no dia seguinte; a dica escolhida no banco e guardada
+  (sem confirmar > quem está no prazo > período vazio > devendo há mais de 30 dias > estoque), "Não quero esse tipo" silencia por
+  90 dias, "Útil" sobe a prioridade e desfaz o silêncio, o mesmo achado não vem em dois dias seguidos; quem está no prazo de voltar
+  (3 visitas a cada 14 dias, última há 30; fora quem não quer mensagens, quem está na creche, quem tem horário e quem ainda está no
+  intervalo); o período vazio (a tarde do dia da semana de amanhã, 4 semanas); conta nova (falta preço, primeiro pet e link). A
+  rota: 401 sem login, 403 para outra loja, o texto da IA de teste guardado e contado uma vez na cota do Mozart
+  (`assistente_uso`), de novo no mesmo dia devolve o guardado; sem cota responde sem IA e devolve a vez; e-mail do dono não
+  confirmado (motivo e-mail, nada contado); número inventado descartado (estado `falhou`, sem nova tentativa no dia). Grants e RLS.
 - `admin-conta-teste.js`: conta de teste (migração 20261240): só o administrador marca (`admin_conta_teste`); dono, recepção e anônimo não marcam nem leem a coluna; o nome "Teste Maestro" não marca nada sozinho. Marcada, sai da Visão geral (total, ativas, cadastros, planos), dos pagantes, das vendas (lojas e pagamentos) e dos números gerais das conversas; a lista de pet shops continua com ela; desmarcada, volta.
 - `dinheiro-n4.js`: migração 20261234 (rodada 9, N4): `centavos` contra o `round()` do banco em 6 mil combinações de preço × quantidade × % (também negativos); venda por peso (0,35 kg × 18,90 = 6,62) sem "desconto dado" e com um centavo de folga; a cadeia do dinheiro (`dinheiro_cadeia`: Recebido 168,61 → Faturamento 121,30 → Resultado −28,70 → depois das taxas −31,58) igual a `faturamento.ts`, `lucro_do_periodo`, `taxas_do_periodo` e `indicadores_do_periodo`; valor médio por conta com uma definição; quem não cuida do financeiro e outra loja recusados; as planilhas de `contador.ts` somadas contra a tela (Conta no resultado, Conta no faturamento, Taxa, repasses a receber, Já recebido e Em aberto, conta em parte, data da conta em aberto, retroativo); saldos em aberto; o crédito datado pelo fuso do pet shop.
 - `caixa-trava-recibos.js`: migração 20261231 (rodada 9, N5): trava de preço em creche e hotel (diária da lista, noites pelas datas, valor da saída com o desconto máximo, pela função do check-out e pela API direta, pacote só do próprio pet, check-out pendente), Alterações (`diaria`, `diarias`, `checkout`, `devolucao`), apagar e baixar valor recebido com a trava, limite de fiado pelo que fica (`fiado_limite_no_fim`: 175,50 com 100,00 pagos fica 75,50), falta com a taxa numa gravação (`agendamento_faltou`), devolução ligada à entrada (`entrada_devolver`, `entradas_devolvidas`), troca fora do dinheiro do caixa (`trocas_do_caixa`) e o Mozart dando baixa em conta de A pagar (`ferramenta-pagar-conta.ts`: a luz de 268,40 sai uma vez só).
@@ -633,6 +665,17 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   registro e "Cliente removido" depois de apagar.
 
 **telas/** (Playwright, Chromium)
+- `resumo-do-dia.js` (precisa do servidor com `GESTAO_RESUMO_FALSO=1`): a folha do Resumo do dia em 390x844 e 1366x900. Dona (390):
+  abre sozinha na primeira entrada, é a Folha do aplicativo (diálogo modal, foco preso, Esc fecha e o foco volta), a saudação, o
+  bloco da data, os três números, a linha do tempo igual à da função (`linhaDoTempo`) com a Mel "ainda não confirmou" e os buracos
+  tracejados, as 7 barras e a frase da semana, o dinheiro (uma linha de previsto, R$ 545,00, com "Agenda R$ 190,00 · Creche e hotel R$ 310,00 · A
+  receber R$ 45,00" em texto pequeno), a dica com "Útil" e "Não quero esse tipo", a frase trocada pelo texto do
+  Mozart de teste; "Começar o dia" fecha; recarregar não reabre (nem com o aparelho sem a lembrança: quem vale é o banco); o botão
+  "Resumo do dia" da tela Hoje revê com o texto guardado; "Ouvir" lê e para (voz de mentira). Recepção (1366): dinheiro do dia sem
+  contas a pagar; "Chamar os 3" e "Chamar quem está no prazo" abrem "Chamar de volta" só com os três tutores e nada é enviado
+  sozinho; "Não quero esse tipo". Tosador (390): só a agenda dele, sem dinheiro. Monitor: viu ontem, abre hoje. Estoque sem cota de
+  IA: texto sem IA. Conta nova (1366): espera o guia inicial fechar e abre com "Para começar". IA que inventa número (390): texto
+  descartado. Em todas: sem rolagem para o lado, sem erro de console e sem violação da regra de conteúdo (CSP).
 - `loja-negocios-site.js`: manuais de negócio fora do site: /negocios leva à página inicial, as 6 páginas de venda dão 404 e saem do sitemap; nenhum link para /negocios no topo, menu do celular, rodapé (sem a coluna Manuais), página inicial (duas portas: /tutor e /gestao), Quem faz, termos, /tutor e página de guia; guias e /gestao no ar. 390 e 1366, capturas em `testes/saida/loja-negocios-*.png`.
 - `abertura-admin-escola.js`: abertura com a primeira resposta da conta ou do pet shop cortada por demora (ou rede caindo): o aplicativo abre sozinho, sem "Opa, algo não carregou" nem "Ainda buscando…"; falhando sempre, a tela de erro com "Tentar de novo" (duas tentativas, não mais). Painel do administrador: o primeiro quadro depois de tocar uma aba já é a aba nova carregando, nunca o conteúdo da anterior. Conta de teste marcada e desmarcada na folha do pet shop (sai de "Todos" e dos números). Escola sem material pago para o cliente (sem preço, "Comprar" nem "em breve") e o painel com "Escondido da loja até ter PDF e o aviso de pagamento". 390 e 1366.
 - `seguranca-reforcos.js` (migração 20261245, 390 e 1366): painel do administrador sem fator mostra o QR code (data:) e o código de
@@ -709,7 +752,7 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   minutos" no aviso do marcado (antes da mudança: 19 toques e 9 campos). 390 até o horário, 1366 até o link.
 - `fotos-redes.js`: a página do boletim em 390 ("Pode postar a foto do Thor…", nada marcado, prévia com o @ = texto guardado,
   "Pode postar desde", "Não quero mais" com confirmação); a ficha e o álbum em 1366 ("Pode postar ✓ (desde dd/mm)", depois
-  "Sem autorização"); o Bom dia do dono (quem deve) e do tosador (sem valor), "Perguntar ao Mozart", "Dispensar por hoje" que não volta.
+  "Sem autorização"). (O cartão "Bom dia", que este arquivo também conferia, virou a folha do Resumo do dia: `telas/resumo-do-dia.js`.)
 - `checkout-lento.js`: check-out do hotel com a leitura do sinal atrasada 2,5 s (390 e 1366): enquanto carrega, a folha não mostra valor
   e o botão fica apagado (clicar não grava); depois, "Receber R$ 2,75" (110 − sinal 107,25) e "Receber R$ 1,60" (80 − 20% do segundo
   pet − sinal 62,40), uma entrada só cada.
@@ -1022,6 +1065,10 @@ Nenhum no momento. (O freio de envios do link, que a 20261168 e a 20261173 tinha
    (profissionais), `L.S` (serviços por nome, com preço por porte), `L.tutores` (Ana, Beto, Clara, Davi), `L.pets` (Thor M e Mel P da Ana,
    Bob G, Luna M, Rex GG), `L.prod` (Shampoo Neutro, R$ 29,90, estoque 20), `L.codigo` (link), `L.hoje`, `L.dia(n)`, `L.mes1`, `L.mesAnterior`.
    `criarLoja(T, { equipe: false, dados: false })` faz uma loja vazia.
+   Resumo do dia: `criarLoja` deixa todo mundo da loja como quem **já viu o resumo de hoje** (senão a folha abriria por cima da
+   tela na primeira entrada de cada teste). `criarLoja(T, { resumo: true })` deixa como veio (a folha abre); `L.resumoVisto()` marca
+   de novo (para quem entrou na equipe depois). Conta criada pela tela de cadastro (sem `criarLoja`): depois do guia inicial a
+   folha abre; `N.fecharAvisos(page)` (que o `N.entrar` chama) também toca em "Começar o dia".
 3. Para chamar código do app (`src/lib/gestao/*.ts`): `const { lib } = require('../lib/app'); const D = lib('dinheiro');`.
 4. Datas: nunca fixas. Use `L.dia(n)`, `B.proximoDia(L.hoje, [1, 3])`, `B.instante(dia, '10:00', L.fuso)`.
 5. Configuração global (`config_interna`, `admins`): guarde o valor de antes e devolva com `T.depois(() => ...)`.

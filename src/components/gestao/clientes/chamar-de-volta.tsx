@@ -62,6 +62,21 @@ function agrupar(itens: PetDoGrupo[]): GrupoChamar[] {
 
 const diasEntre = (de: Date, ate: Date) => Math.round((inicioDoDia(ate).getTime() - inicioDoDia(de).getTime()) / 864e5);
 
+/**
+ * Os tutores escolhidos por outra tela (o Resumo do dia: clientes recorrentes que passaram do intervalo em que costumam
+ * voltar), com os pets deles que já vieram. Não olha o número de dias: quem escolheu foi o banco. Quem saiu há mais tempo vem primeiro.
+ */
+export function quemFoiEscolhido(lista: ParaChamar[], clientes: string[], hoje = new Date()): GrupoChamar[] {
+  const escolhidos = new Set(clientes);
+  const itens: PetDoGrupo[] = [];
+  for (const x of lista) {
+    if (!x.ultima || x.marcado || !escolhidos.has(x.pet.cliente_id)) continue;
+    const faz = diasSemVir(x.ultima, hoje);
+    itens.push({ pet: x.pet, ordem: -faz, detalhe: `${faz < 90 ? `há ${faz} dias` : haQuanto(x.ultima)}${x.servico ? ` · ${x.servico}` : ""}` });
+  }
+  return agrupar(itens);
+}
+
 /** Quem já veio, não vem há mais de `dias` dias e não tem nada marcado (a regra é `sumiu`, a mesma da lista de Clientes). Quem saiu há menos tempo vem primeiro. */
 export function quemSumiu(lista: ParaChamar[], dias: number, hoje = new Date()): GrupoChamar[] {
   const itens: PetDoGrupo[] = [];
@@ -145,7 +160,11 @@ export function chamadoEm(chamados: Chamados, aba: AbaChamar, chave: string, ago
 const DIAS = [30, 45, 60, 90];
 const PASSO = 40;
 
-export default function ChamarDeVolta({ aoFechar, aba: abaInicial = "volta" }: { aoFechar: () => void; aba?: AbaChamar }) {
+export default function ChamarDeVolta({ aoFechar, aba: abaInicial = "volta", somente }: {
+  aoFechar: () => void; aba?: AbaChamar;
+  /** Só estes tutores (ids), já escolhidos por quem abriu a folha (Resumo do dia): sem as abas e sem o filtro de dias. */
+  somente?: string[];
+}) {
   const { sb, petshop, posso } = useGestao();
   const { avisarErro } = useAvisos();
   const podeMudarTexto = posso("clientes") || posso("agenda");
@@ -185,7 +204,7 @@ export default function ChamarDeVolta({ aoFechar, aba: abaInicial = "volta" }: {
 
   const { dados, carregando, erro, recarregar } = useDados(() => buscarParaChamar(sb, petshop.id), [petshop.id]);
 
-  const sumidos = dados ? quemSumiu(dados, dias) : [];
+  const sumidos = dados ? (somente ? quemFoiEscolhido(dados, somente) : quemSumiu(dados, dias)) : [];
   const petsSumidos = sumidos.reduce((n, g) => n + g.pets.length, 0);
   const niver = dados ? aniversariantes(dados) : [];
   const grupos = aba === "volta" ? sumidos : niver;
@@ -228,12 +247,12 @@ export default function ChamarDeVolta({ aoFechar, aba: abaInicial = "volta" }: {
   return (
     <Folha larga titulo="Chamar de volta" aoFechar={aoFechar} rodape={<button type="button" className="g-btn sec" onClick={aoFechar}>Fechar</button>}>
       <div className="g-pilha">
-        <div className="g-seg g-cv-abas" role="group" aria-label="Quem chamar">
+        {!somente && <div className="g-seg g-cv-abas" role="group" aria-label="Quem chamar">
           <button type="button" aria-pressed={aba === "volta"} onClick={() => trocarAba("volta")}>Faz tempo que não vêm{dados ? ` (${sumidos.length})` : ""}</button>
           <button type="button" aria-pressed={aba === "niver"} onClick={() => trocarAba("niver")}>Aniversário{dados ? ` (${niver.length})` : ""}</button>
-        </div>
+        </div>}
 
-        {aba === "volta" && (
+        {aba === "volta" && !somente && (
           <div className="g-campo">
             <span>Sem vir há mais de</span>
             <div className="g-chips" role="group" aria-label="Dias sem vir">
@@ -246,7 +265,8 @@ export default function ChamarDeVolta({ aoFechar, aba: abaInicial = "volta" }: {
           <Vazio titulo="Não consegui montar a lista" texto={erro}><button className="g-btn verde" onClick={() => void recarregar()}>Tentar de novo</button></Vazio>
         ) : carregando && !dados ? <Esqueleto linhas={4} /> : !grupos.length ? (
           aba === "volta"
-            ? <Vazio titulo="Ninguém sumido por aqui" texto={`Quem já veio voltou nos últimos ${dias} dias ou já tem horário marcado.`} />
+            ? somente ? <Vazio titulo="Ninguém para chamar agora" texto="Quem estava no prazo de voltar já tem horário marcado." />
+            : <Vazio titulo="Ninguém sumido por aqui" texto={`Quem já veio voltou nos últimos ${dias} dias ou já tem horário marcado.`} />
             : <Vazio titulo="Nenhum aniversário nos próximos 7 dias" texto="Aparecem aqui os pets com a data de nascimento anotada na ficha." />
         ) : (
           <>
@@ -268,7 +288,7 @@ export default function ChamarDeVolta({ aoFechar, aba: abaInicial = "volta" }: {
 
             {aba === "volta" && (
               <p className="g-pp g-muted">
-                {petsSumidos === 1 ? "1 pet" : `${petsSumidos} pets`} de {sumidos.length === 1 ? "1 tutor" : `${sumidos.length} tutores`}: já vieram, estão há mais de {dias} dias sem vir e não têm nada marcado.
+                {petsSumidos === 1 ? "1 pet" : `${petsSumidos} pets`} de {sumidos.length === 1 ? "1 tutor" : `${sumidos.length} tutores`}: {somente ? "passaram do intervalo em que costumam voltar e não têm nada marcado." : `já vieram, estão há mais de ${dias} dias sem vir e não têm nada marcado.`}
               </p>
             )}
             <p className="g-lb-topo" role="status">

@@ -43,7 +43,8 @@ async function entrar(page, email, senha) {
 }
 async function fecharAvisos(page) {
   for (let k = 0; k < 4; k++) {
-    const x = page.locator('.g-bv-pressa, .g-guia-depois').first();
+    // os avisos de boas-vindas, o guia inicial e a folha do Resumo do dia ("Começar o dia"), se estiverem na tela
+    const x = page.locator('.g-bv-pressa, .g-guia-depois, [data-teste=resumo-comecar]').first();
     if (!(await x.count()) || !(await x.isVisible().catch(() => false))) break;
     await x.click().catch(() => {}); await page.waitForTimeout(600);
   }

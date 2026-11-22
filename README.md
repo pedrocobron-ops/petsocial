@@ -79,6 +79,7 @@ Como as telas são feitas: `src/components/gestao/LEIAME.md`. Banco (tabelas e r
 | `ANTHROPIC_API_KEY` | Chave da IA do Mozart e da Ajuda. Segredo: só na Vercel, nos ambientes Production e Preview. Depois de criar ou trocar, é preciso uma publicação nova para valer |
 | `GESTAO_MODELO` | Modelo do Mozart (padrão `claude-haiku-5-5`) |
 | `GESTAO_AJUDA_MODELO` | Opcional. Modelo da Ajuda (dúvidas de uso; padrão `claude-haiku-5-5`). Sem a chave da IA, a Ajuda responde pelo guia em `src/lib/gestao/ajuda.ts` |
+| `GESTAO_RESUMO_MODELO` | Opcional. Modelo do texto do Resumo do dia (a frase do alto e a redação da dica). Sem ela, usa o `GESTAO_MODELO`. Conta na mesma cota do Mozart; sem IA, a folha abre com o texto escrito pelo sistema |
 | `GESTAO_ASSISTENTE_LIMITE_DIA` | Pedidos ao Mozart por pet shop por dia (padrão 150) |
 | `NEXT_PUBLIC_GESTAO_CHECKOUT_SOLO`, `_EQUIPE`, `_PETSHOP` | Link do checkout mensal de cada plano na Cakto. Com `_3` ou `_6` no fim (ex.: `NEXT_PUBLIC_GESTAO_CHECKOUT_SOLO_6`), o link do plano de 3 ou 6 meses. Os planos e preços ficam em `src/lib/gestao/planos.ts` |
 | `GESTAO_CAKTO_PRODUTO` | Id do produto na Cakto: eventos de outros produtos são ignorados |

@@ -30,6 +30,9 @@ export const abrirAssistente = (pedido?: string) => window.dispatchEvent(new Cus
 /** Evento para abrir o guia inicial de novo (botão em Meu pet shop). Fica aqui, e não no guia, para o guia carregar só quando abre. */
 export const EVENTO_GUIA = "gestao:guia";
 export const abrirGuia = () => window.dispatchEvent(new Event(EVENTO_GUIA));
+/** Pede para a folha do Resumo do dia abrir (o botão "Resumo do dia" da tela Hoje; a folha mora na casca). */
+export const EVENTO_RESUMO = "gestao:resumo-do-dia";
+export const abrirResumoDoDia = () => window.dispatchEvent(new Event(EVENTO_RESUMO));
 /** Abre a folha "O que o seu negócio faz?" (Personalizar o menu Dia a dia), que fica na casca. */
 export const EVENTO_PERSONALIZAR_MENU = "gestao:personalizar-menu";
 export const abrirPersonalizarMenu = () => window.dispatchEvent(new Event(EVENTO_PERSONALIZAR_MENU));

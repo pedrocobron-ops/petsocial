@@ -92,6 +92,16 @@ async function criarLoja(T, o = {}) {
     B.must(await L.sb.dono.from('profissionais').update({ comissao_pct: 40 }).eq('id', L.ids.tosador).select('id'), 'comissão do tosador');
   }
 
+  // Resumo do dia (migração 20261246): a folha abre sozinha na primeira entrada do dia de cada pessoa e ficaria por cima da tela
+  // em todos os testes. Aqui todo mundo da loja fica como quem já viu hoje; `o.resumo: true` deixa como veio (os testes do resumo).
+  L.resumoVisto = () => B.sql(`do $$ begin if to_regclass('public.resumo_do_dia') is not null then
+    insert into public.resumo_do_dia (petshop_id, user_id, dia, visto_em)
+      select x.petshop_id, x.user_id, public.resumo_dia_em(now(), s.fuso), now() from public.profissionais x join public.petshops s on s.id = x.petshop_id
+       where x.petshop_id = '${L.P}' and x.user_id is not null
+    on conflict (petshop_id, user_id, dia) do update set visto_em = coalesce(public.resumo_do_dia.visto_em, now());
+  end if; end $$`);
+  if (!o.resumo) L.resumoVisto();
+
   // clientes e pets
   if (o.dados !== false) {
     for (const [nome, tel, pets] of TUTORES) {

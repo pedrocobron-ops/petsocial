@@ -3,7 +3,9 @@ import { deMin, paraMin } from "./agenda";
 import { linhaDoBomDiaContas } from "./contas-fixas";
 
 /**
- * "Bom dia" do Mozart na tela Hoje: no máximo 3 linhas, sempre do banco (função gestao_bom_dia, uma ida só) e sem chamar a IA.
+ * As linhas do "Bom dia": no máximo 3, sempre do banco (função gestao_bom_dia, uma ida só) e sem chamar a IA. O cartão que
+ * as mostrava na tela Hoje virou a folha do Resumo do dia (resumo-do-dia.ts), que usa estas linhas em "vale lembrar"
+ * (vacina, pacote, aniversário, validade) e chama a mesma leitura de dentro de gestao_resumo_do_dia.
  * O banco já tira o que a pessoa não pode ver (dinheiro só com área de dinheiro; agenda, casa, pacotes pela área). Aqui só se
  * escolhe e escreve: primeiro o dia (agenda e casa), depois, nesta ordem, quem deve e vem hoje, conta fixa vencida, de hoje ou
  * de amanhã (só quem cuida do financeiro e vê o dinheiro: "Aluguel vence amanhã (R$ 2.500,00)"), produto vencido ou vencendo

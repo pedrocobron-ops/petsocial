@@ -1,8 +1,8 @@
-// Fotos nas redes e Bom dia, pela tela (390 e 1366), migração 20261196.
+// Fotos nas redes, pela tela (390 e 1366), migração 20261196.
 // Página do boletim: "Pode postar a foto do Thor nas redes …", nada marcado (Autorizar apagado até escolher), a prévia do texto
 // com o @, "Pode postar desde dd/mm" e "Não quero mais" (confirma e tira). Equipe: a ficha do pet e o álbum mostram
-// "Pode postar ✓ (desde dd/mm)" e, depois de retirada, "Sem autorização". Hoje: o cartão "Bom dia" com até 3 linhas, sem valor
-// para o tosador, "Perguntar ao Mozart" e "Dispensar por hoje" (não volta ao recarregar). Sem rolagem para o lado, sem erro.
+// "Pode postar ✓ (desde dd/mm)" e, depois de retirada, "Sem autorização". Sem rolagem para o lado, sem erro.
+// O cartão "Bom dia" da tela Hoje, que este arquivo também conferia, virou a folha do Resumo do dia (telas/resumo-do-dia.js).
 const fs = require('fs');
 const path = require('path');
 const B = require('../lib/base');
@@ -61,17 +61,7 @@ const SAIDA = path.join(__dirname, '..', 'saida');
   T.secao('computador: a equipe vê na ficha e no álbum');
   ({ ctx, page, erros } = await N.contexto(1366, 900));
   await N.entrar(page, L.emails.dono, L.senha);
-  const bomdia = page.locator('[data-teste=bom-dia]');
-  await bomdia.waitFor({ timeout: 20000 }).catch(() => {});
-  const linhas = await bomdia.locator('li').allTextContents();
-  T.ok('Hoje: o Bom dia aparece com 1 a 3 linhas', linhas.length >= 1 && linhas.length <= 3, linhas);
-  T.ok('dono: a linha de quem deve (Ana, R$ 40,00) aparece', linhas.some((l) => /Ana Souza deve R\$\s40,00/.test(l)), linhas);
-  T.ok('a linha do dia diz quantos horários', /1 horário na agenda/.test(linhas[0] || ''), linhas);
-  await foto(page, '1366-hoje');
-  // o pedido vai para o Mozart pelo evento da tela (sem abrir a conversa: o servidor de teste não tem modelo)
-  await page.evaluate(() => { window.__pedido = null; window.addEventListener('gestao:assistente', (e) => { window.__pedido = e.detail; e.stopImmediatePropagation(); }, { capture: true }); });
-  await bomdia.locator('button', { hasText: 'Perguntar ao Mozart' }).click();
-  T.ok('"Perguntar ao Mozart" manda o pedido do dia ao Mozart', /O que tenho de mais importante hoje/.test(await page.evaluate(() => window.__pedido) || ''));
+  // (o cartão "Bom dia" da tela Hoje virou a folha do Resumo do dia: telas/resumo-do-dia.js)
   await N.ir(page, `/gestao/app/clientes?pet=${L.pets.Thor}`);
   let linha = page.locator('[data-teste=fotos-nas-redes]');
   await linha.waitFor({ timeout: 20000 }).catch(() => {});
@@ -97,22 +87,5 @@ const SAIDA = path.join(__dirname, '..', 'saida');
   T.ok('nenhum erro nas telas da equipe (1366)', erros.length === 0, erros);
   await ctx.close();
 
-  T.secao('celular: o tosador não vê dinheiro e dispensa por hoje');
-  ({ ctx, page, erros } = await N.contexto(390, 844));
-  await N.entrar(page, L.emails.tosador, L.senha);
-  const bd2 = page.locator('[data-teste=bom-dia]');
-  await bd2.waitFor({ timeout: 20000 }).catch(() => {});
-  const l2 = await bd2.locator('li').allTextContents();
-  T.ok('tosador: o Bom dia aparece, sem valor nem quem deve', l2.length >= 1 && !l2.some((l) => /R\$|deve/.test(l)), l2);
-  T.ok('sem rolagem para o lado (390, Hoje)', (await N.rolagemLateral(page)) <= 0);
-  await foto(page, '390-hoje-tosador');
-  await bd2.locator('button[aria-label="Dispensar o resumo por hoje"]').click();
-  T.ok('"Dispensar por hoje" fecha o cartão', (await page.locator('[data-teste=bom-dia]').count()) === 0);
-  await page.reload();
-  await page.waitForSelector('.g-main');
-  await page.waitForTimeout(1500);
-  T.ok('recarregando no mesmo dia, não volta', (await page.locator('[data-teste=bom-dia]').count()) === 0);
-  T.ok('nenhum erro (390)', erros.length === 0, erros);
-  await ctx.close();
   await N.fecharNavegador();
 }))();
