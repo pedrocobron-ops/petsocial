@@ -321,9 +321,12 @@ grant execute on function public.link_ia_contar(text, text, text) to anon, authe
 -- ============================================================
 -- 4c. Consultas anônimas do link com freio por rede
 -- ============================================================
-create or replace function public.link_horarios(p_codigo text, p_servico uuid, p_dia date, p_pets integer default 1, p_extras jsonb default null)
-returns setof text
-language plpgsql volatile security definer set search_path = '' as $$
+CREATE OR REPLACE FUNCTION public.link_horarios(p_codigo text, p_servico uuid, p_dia date, p_pets integer DEFAULT 1, p_extras jsonb DEFAULT NULL::jsonb)
+ RETURNS SETOF text
+ LANGUAGE plpgsql
+ VOLATILE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
 declare
   v public.petshops;
   v_dur int;
@@ -337,6 +340,8 @@ declare
   v_ini timestamptz;
   n int := least(4, greatest(1, coalesce(p_pets, 1)));
   v_extras uuid[];
+  v_loja boolean := false;
+  x record;
 begin
   select * into v from public.petshops where link_codigo = p_codigo and link_ativo;
   if not found or not public.acesso_liberado(v.id) then return; end if;
@@ -350,15 +355,32 @@ begin
   v_dur := least(1440, v_dur + coalesce((select sum(s.duracao_min) from public.servicos s where s.id = any (v_extras) and s.petshop_id = v.id), 0)::int) * n;
   if p_dia < (now() at time zone v.fuso)::date or p_dia > (now() at time zone v.fuso)::date + 60 then return; end if;
   if public.dia_fechado(v.id, p_dia) then return; end if;
+  -- a janela do dia: a parte em que todos os serviços escolhidos funcionam
+  v_abre := 0;
+  v_fecha := 1440;
+  for x in select s.horario is null as da_loja, coalesce(s.horario, v.horario) -> (extract(dow from p_dia)::int)::text as dia
+           from public.servicos s where s.petshop_id = v.id and (s.id = p_servico or s.id = any (v_extras)) loop
+    v_h := x.dia;
+    if v_h is null or jsonb_typeof(v_h) <> 'object' or coalesce(v_h ->> 'abre', '') !~ '^\d{2}:\d{2}' or coalesce(v_h ->> 'fecha', '') !~ '^\d{2}:\d{2}' then
+      return;
+    end if;
+    v_abre := greatest(v_abre, extract(hour from (v_h ->> 'abre')::time)::int * 60 + extract(minute from (v_h ->> 'abre')::time)::int);
+    v_fecha := least(v_fecha, extract(hour from (v_h ->> 'fecha')::time)::int * 60 + extract(minute from (v_h ->> 'fecha')::time)::int);
+    v_loja := v_loja or x.da_loja;
+  end loop;
+  -- o almoço do pet shop (só vale no dia em que o pet shop abre antes e continua aberto depois, como na tela)
   v_h := v.horario -> (extract(dow from p_dia)::int)::text;
-  if v_h is null or jsonb_typeof(v_h) <> 'object' then return; end if;
-  v_abre := extract(hour from (v_h ->> 'abre')::time)::int * 60 + extract(minute from (v_h ->> 'abre')::time)::int;
-  v_fecha := extract(hour from (v_h ->> 'fecha')::time)::int * 60 + extract(minute from (v_h ->> 'fecha')::time)::int;
-  v_al := v_h -> 'almoco';
-  if v_al is not null and jsonb_typeof(v_al) = 'object' and (v_al ->> 'de') ~ '^\d{2}:\d{2}' and (v_al ->> 'ate') ~ '^\d{2}:\d{2}' then
-    v_ai := left(v_al ->> 'de', 2)::int * 60 + substr(v_al ->> 'de', 4, 2)::int;
-    v_af := left(v_al ->> 'ate', 2)::int * 60 + substr(v_al ->> 'ate', 4, 2)::int;
-    if not (v_af > v_ai and v_abre < v_ai and v_fecha > v_af) then v_ai := null; end if;
+  if v_loja and v_h is not null and jsonb_typeof(v_h) = 'object' then
+    v_al := v_h -> 'almoco';
+    if v_al is not null and jsonb_typeof(v_al) = 'object' and (v_al ->> 'de') ~ '^\d{2}:\d{2}' and (v_al ->> 'ate') ~ '^\d{2}:\d{2}' then
+      v_ai := left(v_al ->> 'de', 2)::int * 60 + substr(v_al ->> 'de', 4, 2)::int;
+      v_af := left(v_al ->> 'ate', 2)::int * 60 + substr(v_al ->> 'ate', 4, 2)::int;
+      if not (v_af > v_ai
+              and extract(hour from (v_h ->> 'abre')::time)::int * 60 + extract(minute from (v_h ->> 'abre')::time)::int < v_ai
+              and extract(hour from (v_h ->> 'fecha')::time)::int * 60 + extract(minute from (v_h ->> 'fecha')::time)::int > v_af) then
+        v_ai := null;
+      end if;
+    end if;
   end if;
   m := v_abre;
   while m + v_dur <= v_fecha loop
@@ -369,7 +391,7 @@ begin
     end if;
     m := m + 30;
   end loop;
-end $$;
+end $function$;
 
 create or replace function public.link_hotel_estimativa(p_codigo text, p_entrada date, p_saida date, p_pets jsonb, p_juntos boolean default true)
 returns jsonb
@@ -442,7 +464,7 @@ begin
   select d::date
   from public.petshops p, generate_series(p_de, least(p_ate, p_de + 62), interval '1 day') d
   where p.link_codigo = p_codigo and p.link_ativo and p_tipo in ('creche', 'hotel')
-    and ((p_tipo = 'creche' and (not public.creche_abre(p.horario, d::date) or public.dia_fechado(p.id, d::date)))
+    and ((p_tipo = 'creche' and (not public.creche_abre(coalesce(p.horario_creche, p.horario), d::date) or public.dia_fechado(p.id, d::date)))
      or ((case p_tipo when 'creche' then p.vagas_creche else p.vagas_hotel end) is not null
     and (
       (select count(*) from public.estadias e where e.petshop_id = p.id and e.tipo = p_tipo and e.status in ('reservada', 'em_casa')
