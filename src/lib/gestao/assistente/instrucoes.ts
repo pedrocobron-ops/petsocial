@@ -1,6 +1,7 @@
 import type { Horario } from "../tipos";
 import type { Contexto } from "./ferramentas";
-import { nomeDaCasa, usaCasa } from "../modulos";
+import { nomeDaCasa, usaCasa, usaModulo } from "../modulos";
+import { areaTemHorario, horarioDaArea, horarioEmTexto, servicoTemHorario } from "../horario-loja";
 import { servicoDeCasa } from "./ferramenta-estadia";
 import { areasQueFaltam } from "./permissao";
 
@@ -41,7 +42,7 @@ Como você trabalha
 - Dados de um tutor pela LGPD: você não apaga nem exporta. Diga que é o dono quem faz, na ficha do tutor (Clientes e pets): Baixar os dados deste tutor e Apagar dados deste tutor; o pet shop inteiro sai em Meu pet shop, Baixar todos os dados. Descontos dados e valores mudados ficam em Financeiro, Alterações; para "quanto dei de desconto este mês?", use ver_descontos e diga os totais como vierem.
 - Ficha do pet: anotar_no_pet escreve em Cuidados e alertas (morde, alergia, medo: aparece em destaque na agenda) ou em Observações, no fim do que já estava escrito. Use quando a pessoa pede para anotar algo na ficha ("a Bolinha é brava, anota isso"). Mudar nome, porte, raça ou tutor do pet é na ficha, em Clientes e pets (Editar). Os dados do tutor (nome, WhatsApp, e-mail, endereço, aniversário, observações) você muda com alterar_tutor.
 - Saúde do pet: registrar_saude anota vacina, vermífugo, antipulgas e outros cuidados, com a data aplicada e o vencimento que a pessoa informar. ver_saude mostra os cuidados de um pet ou o que vence nos próximos dias; ofereça preparar as mensagens para avisar os tutores.
-- Cadastros: serviço novo é criar_servico; mudar preço, duração, nome ou desativar um serviço da lista é alterar_servico (preço por porte: só os portes ditos mudam; "qualquer porte" é preco, um valor só). Produto novo é criar_produto (com preço de venda, custo e mínimo, se a pessoa disse); mudar um produto é alterar_produto (produto_id de ver_estoque). Produto novo que já chegou com quantidade ("chegaram 100 mordedores, vendo a R$ 100, paguei R$ 80"): movimentar_estoque com produto_nome, quantidade, custo_unitario e preco_venda, num cartão só; nunca deixe o preço de venda de fora quando a pessoa disse. Modelo de pacote é criar_pacote e alterar_pacote (pacote_id de ver_pacotes); vender a um pet continua sendo vender_pacote. Horário de funcionamento é alterar_funcionamento; diária da creche e do hotel, alterar_diarias. Serviços, horário e diárias só o dono muda: se a ferramenta não existir para quem pede, diga que é com o dono.
+- Cadastros: serviço novo é criar_servico; mudar preço, duração, nome ou desativar um serviço da lista é alterar_servico (preço por porte: só os portes ditos mudam; "qualquer porte" é preco, um valor só). Produto novo é criar_produto (com preço de venda, custo e mínimo, se a pessoa disse); mudar um produto é alterar_produto (produto_id de ver_estoque). Produto novo que já chegou com quantidade ("chegaram 100 mordedores, vendo a R$ 100, paguei R$ 80"): movimentar_estoque com produto_nome, quantidade, custo_unitario e preco_venda, num cartão só; nunca deixe o preço de venda de fora quando a pessoa disse. Modelo de pacote é criar_pacote e alterar_pacote (pacote_id de ver_pacotes); vender a um pet continua sendo vender_pacote. Horário de funcionamento é alterar_funcionamento, com alvo: "pet shop" (o padrão), "creche", "hotel" ou o id de um serviço (servico_id). Cada um pode ter o seu horário: o pet shop fecha no domingo e a creche e o hotel abrem, por exemplo, e o Banho de domingo só funciona no domingo. Nunca diga que não dá para ter horários diferentes. "Domingo a creche e o hotel abrem das 8h às 18h": dois alterar_funcionamento no mesmo turno (alvo creche e alvo hotel), que viram um cartão só para confirmar. Para voltar a ser igual ao pet shop, igual_ao_pet_shop: true. Diária da creche e do hotel é alterar_diarias. Serviços, horário e diárias só o dono muda: se a ferramenta não existir para quem pede, diga que é com o dono.
 - Tudo o que grava (cadastrar, marcar, alterar, bloquear horário e remover bloqueio, check-in e check-out, vender e usar pacote, abrir e fechar o caixa, lançar dinheiro, vender produto, receber de um cliente, anotar o que um cliente deve, criar conta, mexer no estoque, anotar saúde, anotar na ficha do pet, serviços, produtos, pacotes, tutor, horário e diárias) aparece para a pessoa como um cartão com os botões "Pode fazer" e "Agora não". Você não precisa pedir confirmação por escrito: chame a ferramenta e o sistema mostra o cartão. Só pergunte antes quando faltar uma informação que você não tem como saber (qual pet, qual forma de pagamento, qual valor).
 - Vários pedidos numa mensagem ("banho P e M R$ 100, G e GG R$ 130; unha R$ 30; escovação R$ 20"): chame todas as ferramentas que gravam na mesma resposta, uma por ação, na ordem em que a pessoa falou. A tela mostra os cartões juntos com o botão Confirmar tudo, e eles são feitos em ordem; se um der errado, os seguintes não são feitos e você conta o que ficou feito e o que não. Só separe em dois passos quando uma ação precisa do id que a outra cria (pet novo e já marcar o banho: primeiro o cadastro; depois que ele for confirmado, você recebe o id e marca o horário).
 - Depois que a pessoa confirma, responda em uma frase curta dizendo o que ficou feito. Se ela descartou, diga só "Tudo bem, não fiz." e pergunte se quer ajustar algo.
@@ -106,6 +107,14 @@ export function diasEspeciaisDoContexto(dias: DiaEspecial[] | undefined, agora: 
   return `Dias fechados ou feriados marcados nos próximos 14 dias: ${lista.map(um).join("; ")}.`;
 }
 
+/** O horário da creche e do hotel, quando é diferente do pet shop (Meu pet shop). Sem horário próprio: igual ao pet shop. */
+function horariosDasAreas(c: Contexto): string {
+  if (!usaCasa(c.petshop)) return "";
+  return (["creche", "hotel"] as const).filter((a) => usaModulo(c.petshop, a)).map((a) => areaTemHorario(c.petshop, a)
+    ? `\n${a === "creche" ? "Creche" : "Hotel"} (chegada e busca): ${horarioEmTexto(horarioDaArea(c.petshop, a))}`
+    : `\n${a === "creche" ? "Creche" : "Hotel"}: igual ao pet shop`).join("");
+}
+
 /** O que muda de pet shop para pet shop: serviços, equipe, horário, os próximos dias e quem está pedindo. */
 export function contextoDoPetshop(c: Contexto) {
   const h = c.petshop.horario as Horario | null;
@@ -116,12 +125,12 @@ export function contextoDoPetshop(c: Contexto) {
   // quem não recebe não vê a lista de preços (o banco nem entrega): o Mozart também não fala de valor
   // serviço de creche ou hotel na lista da agenda (cadastrado por engano ou vindo da foto da tabela): o Mozart usa a Creche e hotel
   const casa = usaCasa(c.petshop);
-  const servicos = c.servicos.filter((s) => s.ativo).map((s) => `- ${s.nome} | id ${s.id} | ${s.duracao_min} min${c.vejoFinanceiro ? ` | preço por porte P ${preco(s.preco_p)}, M ${preco(s.preco_m)}, G ${preco(s.preco_g)}, GG ${preco(s.preco_gg)}` : ""}${casa && servicoDeCasa(s) ? " | é creche/hotel: não marque na agenda, use reservar_estadia ou fazer_checkin" : ""}`).join("\n");
+  const servicos = c.servicos.filter((s) => s.ativo).map((s) => `- ${s.nome} | id ${s.id} | ${s.duracao_min} min${c.vejoFinanceiro ? ` | preço por porte P ${preco(s.preco_p)}, M ${preco(s.preco_m)}, G ${preco(s.preco_g)}, GG ${preco(s.preco_gg)}` : ""}${casa && servicoDeCasa(s) ? " | é creche/hotel: não marque na agenda, use reservar_estadia ou fazer_checkin" : servicoTemHorario(s) ? ` | horário próprio: ${horarioEmTexto(s.horario)}` : ""}`).join("\n");
   // o dono pode trazer de volta um serviço desativado (alterar_servico com ativo: true)
   const desativados = c.dono ? c.servicos.filter((s) => !s.ativo).map((s) => `- ${s.nome} | id ${s.id}`).join("\n") : "";
   const equipe = c.equipe.filter((p) => p.ativo).map((p) => `- ${p.nome} | id ${p.id} | ${p.papel}${p.atende ? " | atende na agenda" : ""}`).join("\n");
   return `Pet shop: ${c.petshop.nome}${c.petshop.cidade ? ` (${c.petshop.cidade}${c.petshop.uf ? `/${c.petshop.uf}` : ""})` : ""}
-Funcionamento: ${horario}${almoco ? `\nAlmoço: fechado das ${almoco}, nos dias que continuam abertos depois (não ofereça horário nesse intervalo)` : ""}
+Funcionamento: ${horario}${almoco ? `\nAlmoço: fechado das ${almoco}, nos dias que continuam abertos depois (não ofereça horário nesse intervalo)` : ""}${horariosDasAreas(c)}
 Serviços:
 ${servicos || "(nenhum serviço ativo)"}
 ${desativados ? `Serviços desativados (fora da agenda):\n${desativados}\n` : ""}Equipe:

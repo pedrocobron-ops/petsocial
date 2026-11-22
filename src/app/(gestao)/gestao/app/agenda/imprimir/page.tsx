@@ -1,5 +1,6 @@
 "use client";
 
+import { horarioDaAgenda } from "@/lib/gestao/horario-loja";
 import { Suspense, useMemo, useState, useEffect } from "react";
 import Link from "@/components/gestao/link-depois";
 import { useSearchParams } from "next/navigation";
@@ -22,7 +23,8 @@ import "./imprimir.css";
  */
 function Folha() {
   const params = useSearchParams();
-  const { sb, petshop, equipe } = useGestao();
+  const { sb, petshop, equipe, servicos } = useGestao();
+  const horarioAgenda = horarioDaAgenda(petshop.horario, servicos);
   const [dia, setDia] = useState(() => params.get("dia") ?? isoDia(new Date()));
   const [visao, setVisao] = useState<"dia" | "semana">(params.get("visao") === "semana" ? "semana" : "dia");
   const [prof, setProf] = useState<string>(params.get("prof") ?? "");
@@ -38,7 +40,7 @@ function Folha() {
   const atendem = equipe.filter((p) => p.ativo && p.atende);
   // dia fechado: a data marcada em Meu pet shop (com o motivo) ou o dia em que o pet shop não abre na semana
   useCalendario();
-  const fechadoEm = (d: Date) => fraseDoDiaFechado(isoDia(d)) ?? (horarioDoDia(petshop.horario, d) ? null : "O pet shop não abre neste dia");
+  const fechadoEm = (d: Date) => fraseDoDiaFechado(isoDia(d)) ?? (horarioDoDia(horarioAgenda, d) ? null : "O pet shop não abre neste dia");
 
   const { dados, carregando } = useDados(async () => {
     const [ags, bloqs] = await Promise.all([
@@ -52,7 +54,7 @@ function Folha() {
   const bloqueiosDoDia = (d: Date) => (dados?.bloqueios ?? []).filter((b) => new Date(b.inicio) < somaDias(d, 1) && new Date(b.fim) > d && (!prof || !b.profissional_id || b.profissional_id === prof));
   const quem = prof ? equipe.find((p) => p.id === prof)?.nome ?? "" : "";
   const periodo = visao === "dia" ? dataLonga(data) : `${dataCurta(dias[0])} a ${dataCurta(dias[6])}`;
-  const mostrados = dias.filter((d) => visao === "dia" || doDia(d).length > 0 || horarioDoDia(petshop.horario, d));
+  const mostrados = dias.filter((d) => visao === "dia" || doDia(d).length > 0 || horarioDoDia(horarioAgenda, d));
 
   // a mesma agenda em texto, para colar ou mandar no WhatsApp
   const texto = [`Agenda ${petshop.nome} · ${periodo}${quem ? ` · ${quem}` : ""}`,

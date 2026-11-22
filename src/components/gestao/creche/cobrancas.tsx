@@ -1,5 +1,6 @@
 "use client";
 
+import { horarioDaCreche } from "@/lib/gestao/horario-loja";
 import { useEffect, useState } from "react";
 import Link from "@/components/gestao/link-depois";
 import { AlertTriangle, Ban, CalendarClock, Check, ChevronLeft, ChevronRight, CircleCheck, HandCoins, MessageCircle, Pencil, Printer, RotateCcw, TriangleAlert, Undo2 } from "lucide-react";
@@ -140,7 +141,7 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
   });
   const todas = [...(dados?.antigas ?? []), ...abertas];
   // plano que terminou e a mensalidade do mês da saída ficou cheia (a folha do acerto pode ter fechado sem escolha)
-  const saidas = saidasParaAcertar(planos, todas, petshop.horario);
+  const saidas = saidasParaAcertar(planos, todas, horarioDaCreche(petshop));
   const doBloco = (b: EstadoCobranca) => todas.filter((c) => estadoDaCobranca(c, hoje).estado === b);
   /**
    * Os grupos de um bloco. O tutor aparece num bloco só, o da cobrança mais urgente dele (atrasada, hoje, a vencer),
@@ -458,18 +459,18 @@ function GerarCobrancas({ sobras, mes, planos, todos, comCobranca, aoFechar, aoG
 
   const diaria = petshop.diaria_creche == null ? 0 : Number(petshop.diaria_creche);
   const linhas: LinhaGerar[] = planos.map((plano) => {
-    const sugestao = plano.valor_mensal == null ? null : sugestaoDoMes(plano, mes, plano.valor_mensal, petshop.horario);
+    const sugestao = plano.valor_mensal == null ? null : sugestaoDoMes(plano, mes, plano.valor_mensal, horarioDaCreche(petshop));
     const vencimento = vencimentoDoMes(plano, mes);
     // primeira cobrança do plano que já nasceria vencida: sem escolha ainda, ou escolhida como a deste mês em "Cobrar por aqui"
     const primeira = (!plano.primeira_cobranca || plano.primeira_cobranca === mesIso) && !comCobranca.has(plano.id) && vencimento < hoje;
     const escolha = primeira ? escolhas[plano.id] ?? null : null;
     // "de hoje em diante" só faz sentido no mês corrente
-    const daquiPraFrente = primeira && mesIso === mesDeHoje && plano.valor_mensal != null ? proporcionalDesde(plano, mes, plano.valor_mensal, petshop.horario, hoje) : null;
+    const daquiPraFrente = primeira && mesIso === mesDeHoje && plano.valor_mensal != null ? proporcionalDesde(plano, mes, plano.valor_mensal, horarioDaCreche(petshop), hoje) : null;
     const digitado = plano.id in valores ? valores[plano.id] : sugestao?.valor ?? null;
     const valor = escolha === "proporcional" ? daquiPraFrente?.valor ?? null : digitado;
     return {
       plano, sugestao, primeira, escolha, daquiPraFrente, valor,
-      irmao: valor == null ? 0 : descontoIrmao(petshop, todos, plano, mes, valor, petshop.horario),
+      irmao: valor == null ? 0 : descontoIrmao(petshop, todos, plano, mes, valor, horarioDaCreche(petshop)),
       extras: extras?.get(plano.pet_id) ?? [], unit: plano.valor_extra ?? diaria, taxas: taxas?.get(plano.pet_id) ?? [], vencimento: primeira ? hoje : vencimento,
       taxi: taxis?.get(plano.pet_id) ?? [], taxiMes: plano.taxi && plano.taxi_modo === "mes" && (plano.taxi_valor ?? 0) > 0 ? Number(plano.taxi_valor) : 0,
     };
@@ -596,12 +597,12 @@ function EditarCobranca({ cobranca: c, planos, aoFechar, aoSalvo }: { cobranca: 
   const extras = extrasDaCobranca(c), taxas = taxasDaCobranca(c), partes = partesDosExtras(c);
   const planoDaCobranca = planos.find((p) => p.id === c.plano_id);
   const irmao = valor == null || valor === Number(c.valor_mensal) || c.acerto_saida ? partesDoDesconto(c).irmao
-    : regraIrmaoDe(petshop).ativo ? (planoDaCobranca ? descontoIrmao(petshop, planos, planoDaCobranca, deIsoDia(c.mes), valor, petshop.horario) : 0)
+    : regraIrmaoDe(petshop).ativo ? (planoDaCobranca ? descontoIrmao(petshop, planos, planoDaCobranca, deIsoDia(c.mes), valor, horarioDaCreche(petshop)) : 0)
     : Math.min(partesDoDesconto(c).irmao, valor);
   const total = centavos((valor ?? 0) + Number(c.valor_extras) - (desconto ?? 0) - irmao);
   // o plano termina neste mês: a mensalidade pelos dias até a saída (a mesma conta do acerto da saída)
   const fim = planoDaCobranca?.fim && !c.acerto_saida && isoMes(deIsoDia(planoDaCobranca.fim)) === c.mes ? planoDaCobranca.fim : null;
-  const pelaSaida = fim && planoDaCobranca ? sugestaoDoMes(planoDaCobranca, deIsoDia(c.mes), Number(c.valor_cheio), petshop.horario) : null;
+  const pelaSaida = fim && planoDaCobranca ? sugestaoDoMes(planoDaCobranca, deIsoDia(c.mes), Number(c.valor_cheio), horarioDaCreche(petshop)) : null;
 
   async function salvar() {
     if (salvando) return;
@@ -819,12 +820,12 @@ function CobrarPorAqui({ plano, planos, mes, aoFechar, aoFeito }: { plano: Plano
   const nome = plano.pets?.nome ?? "o pet";
   const vencimento = vencimentoDoMes(plano, mes);
   const passou = vencimento < hoje;
-  const cheio = plano.valor_mensal == null ? null : sugestaoDoMes(plano, mes, plano.valor_mensal, petshop.horario);
-  const daqui = passou && mesIso === isoMes(new Date()) && plano.valor_mensal != null ? proporcionalDesde(plano, mes, plano.valor_mensal, petshop.horario, hoje) : null;
+  const cheio = plano.valor_mensal == null ? null : sugestaoDoMes(plano, mes, plano.valor_mensal, horarioDaCreche(petshop));
+  const daqui = passou && mesIso === isoMes(new Date()) && plano.valor_mensal != null ? proporcionalDesde(plano, mes, plano.valor_mensal, horarioDaCreche(petshop), hoje) : null;
   const [escolha, setEscolha] = useState<"inteiro" | "proporcional" | null>(passou ? null : "inteiro");
   const valor = escolha === "proporcional" ? daqui?.valor ?? null : cheio?.valor ?? null;
   // desconto para irmãos (opção da creche): o banco aplica ao gerar; aqui só mostra
-  const irmao = valor == null ? 0 : descontoIrmao(petshop, planos, plano, mes, valor, petshop.horario);
+  const irmao = valor == null ? 0 : descontoIrmao(petshop, planos, plano, mes, valor, horarioDaCreche(petshop));
 
   const gerar = () => op.fazer(async () => {
     if (!escolha || valor == null) return false;

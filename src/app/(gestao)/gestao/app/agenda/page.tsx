@@ -1,5 +1,6 @@
 "use client";
 
+import { horarioDaAgenda } from "@/lib/gestao/horario-loja";
 import { enderecoEmLinha } from "@/lib/gestao/endereco";
 import { alertaCurto } from "@/lib/gestao/quadro";
 import { guardarLembrado, lerLembrado } from "@/components/gestao/lembrado";
@@ -47,7 +48,9 @@ const H_HORA = 64; // altura de uma hora na visão de semana, em px
 type Trecho = { b: Bloqueio; de: number; ate: number; inteiro: boolean };
 
 function Agenda() {
-  const { sb, petshop, equipe, liberado, souDono, eu, vejoFinanceiro } = useGestao();
+  const { sb, petshop, equipe, servicos, liberado, souDono, eu, vejoFinanceiro } = useGestao();
+  // o horário do pet shop, aberto também nos dias e horas dos serviços com horário próprio (Meu pet shop, Serviços)
+  const horarioAgenda = useMemo(() => horarioDaAgenda(petshop.horario, servicos), [petshop.horario, servicos]);
   const simples = modoSimples(petshop);
   useFaxinaDoBoletim(); // boletim do pet: apaga os arquivos da fila (nada aparece na tela)
   const router = useRouter();
@@ -85,7 +88,7 @@ function Agenda() {
   // dia marcado como fechado em Meu pet shop (feriado, folga, médico): vale como o dia em que o pet shop não abre na semana
   useCalendario();
   const fechadoEm = (d: Date) => fraseDoDiaFechado(isoDia(d));
-  const abreEm = (d: Date) => (fechadoEm(d) ? null : horarioDoDia(petshop.horario, d));
+  const abreEm = (d: Date) => (fechadoEm(d) ? null : horarioDoDia(horarioAgenda, d));
   const data = deIsoDia(dia);
   const segunda = inicioDaSemana(data);
   const semana = useMemo(() => Array.from({ length: 7 }, (_, i) => somaDias(segunda, i)), [segunda.getTime()]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -143,7 +146,7 @@ function Agenda() {
   const bloqueiosDoDia = trechosDe(data);
   /** O pet shop inteiro bloqueado o dia todo (ou todo o horário em que abre): na semana, o dia aparece como bloqueado, não "aberto". */
   const bloqueioDoDiaTodo = (d: Date) => {
-    const h = horarioDoDia(petshop.horario, d);
+    const h = horarioDoDia(horarioAgenda, d);
     return trechosDe(d).find((t) => !t.b.profissional_id && (t.inteiro || (h && t.de <= paraMin(h.abre) && t.ate >= paraMin(h.fecha))))?.b ?? null;
   };
   const textoDoBloqueio = (b: Bloqueio) => `Bloqueado${b.motivo ? `: ${b.motivo}` : ""}`;
@@ -154,7 +157,7 @@ function Agenda() {
   const diaFechadoHoje = fechadoEm(data);
   const funcionamento = abreEm(data);
   // almoço do pet shop (Meu pet shop > Horário): intervalo fechado todo dia, sem bloqueio manual
-  const almoco = diaFechadoHoje || bloqueioDoDiaTodo(data) ? null : almocoDoDia(petshop.horario, data);
+  const almoco = diaFechadoHoje || bloqueioDoDiaTodo(data) ? null : almocoDoDia(horarioAgenda, data);
   const linhas = useMemo(() => {
     type Linha = { tipo: "ag"; a: AgendamentoCompleto } | { tipo: "livre"; de: number; ate: number } | { tipo: "bloq"; t: Trecho } | { tipo: "almoco"; de: number; ate: number };
     const out: { de: number; linha: Linha }[] = [];
@@ -209,15 +212,15 @@ function Agenda() {
   // semana: faixa de horas mostrada
   const faixa = useMemo(() => {
     let ini = 8 * 60, fim = 18 * 60;
-    const abertos = semana.map((d) => horarioDoDia(petshop.horario, d)).filter(Boolean) as { abre: string; fecha: string }[];
+    const abertos = semana.map((d) => horarioDoDia(horarioAgenda, d)).filter(Boolean) as { abre: string; fecha: string }[];
     if (abertos.length) { ini = Math.min(...abertos.map((h) => paraMin(h.abre))); fim = Math.max(...abertos.map((h) => paraMin(h.fecha))); }
     for (const a of todos) {
       const i = new Date(a.inicio), f = new Date(a.fim);
       ini = Math.min(ini, i.getHours() * 60); fim = Math.max(fim, f.getHours() * 60 + (f.getMinutes() ? 60 : 0));
     }
     return { ini: Math.floor(ini / 60) * 60, fim: Math.ceil(fim / 60) * 60 };
-  }, [semana, petshop.horario, todos]);
-  const diasDaSemana = semana.filter((d) => horarioDoDia(petshop.horario, d) || temNoDia(d));
+  }, [semana, horarioAgenda, todos]);
+  const diasDaSemana = semana.filter((d) => horarioDoDia(horarioAgenda, d) || temNoDia(d));
 
   return (
     <>
@@ -340,7 +343,7 @@ function Agenda() {
                     <div className="g-agora" style={{ top: ((agora.getHours() * 60 + agora.getMinutes() - faixa.ini) / 60) * H_HORA }} />
                   )}
                   {(() => {
-                    const al = fechadoEm(d) || bloqueioDoDiaTodo(d) ? null : almocoDoDia(petshop.horario, d);
+                    const al = fechadoEm(d) || bloqueioDoDiaTodo(d) ? null : almocoDoDia(horarioAgenda, d);
                     return al && <div className="g-agd-faixa almoco" title={`Almoço, das ${al.de} às ${al.ate}. Muda em Meu pet shop, no horário de funcionamento.`}
                       style={{ top: ((al.inicio - faixa.ini) / 60) * H_HORA, height: ((al.fim - al.inicio) / 60) * H_HORA }}><Utensils aria-hidden /><span>Almoço</span></div>;
                   })()}

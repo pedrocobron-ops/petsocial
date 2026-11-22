@@ -1,3 +1,4 @@
+import { horarioDaCreche } from "../horario-loja";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Horario } from "../tipos";
 import type { Contexto } from "./ferramentas";
@@ -58,7 +59,7 @@ export async function consultarPlanosDaCreche(c: Contexto, e: Record<string, unk
     c.vejoFinanceiro && comTaxi.length ? sb.from("creche_taxi").select("plano_id, valor").eq("petshop_id", petshop.id).in("plano_id", comTaxi).is("cobranca_id", null).limit(2000) : null,
   ]);
   const fechado = new Set((fechados.data ?? []).map((d) => d.dia));
-  const horario = petshop.horario as Horario | null;
+  const horario = horarioDaCreche(petshop) as Horario | null;
   const abre = (dia: string) => { const h = horario?.[String(dow(dia))]; const algum = [0, 1, 2, 3, 4, 5, 6].some((i) => horario?.[String(i)]); return !algum || Boolean(h && h.abre && h.fecha); };
   const esperado = (p: Plano, dia: string) => p.inicio <= dia && (!p.fim || p.fim >= dia) && !(p.pausa_de && p.pausa_ate && dia >= p.pausa_de && dia <= p.pausa_ate)
     && p.dias.includes(dow(dia)) && abre(dia) && !fechado.has(dia);

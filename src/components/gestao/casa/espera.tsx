@@ -1,5 +1,6 @@
 "use client";
 
+import { horarioDaCreche } from "@/lib/gestao/horario-loja";
 import { useState } from "react";
 import { BellRing, CalendarPlus, Check, Hourglass, MessageCircle, Plus, X } from "lucide-react";
 import { diasDaEspera, esperaDe, esperaVale, mensagemDeVaga, periodoDaEspera, type Espera } from "@/lib/gestao/casa-opcoes";
@@ -37,7 +38,7 @@ export function temVagaNosDias(petshop: Parameters<typeof vagasDoTipo>[0] & { ho
   const vagas = vagasDoTipo(petshop, tipo);
   if (vagas == null) return true;
   const hoje = isoDia(new Date()), agora = new Date();
-  return diasDaEspera({ tipo, entrada, saida }, hoje).every((d) => vagas - ocupadasNoDia(tipo, abertas, null, d, agora, mens, petshop.horario as never) > 0);
+  return diasDaEspera({ tipo, entrada, saida }, hoje).every((d) => vagas - ocupadasNoDia(tipo, abertas, null, d, agora, mens, horarioDaCreche(petshop)) > 0);
 }
 export type ListaEspera = { ligada: boolean; linhas: LinhaDaEspera[]; comVaga: LinhaDaEspera[]; recarregar: () => Promise<void> };
 
@@ -65,7 +66,7 @@ export function useListaDeEspera(abertas: EstadiaCompleta[], mens: Mens | null):
     const vagas = vagasDoTipo(petshop, e.tipo);
     if (vagas == null) return { e, temVaga: true, cheioEm: null, posicao, vez: null };
     const dias = diasDaEspera(e, hoje);
-    const livres = (d: string) => vagas - ocupadasNoDia(e.tipo, abertas, null, d, agora, mens, petshop.horario) - (usadas.get(`${e.tipo}:${d}`) ?? 0);
+    const livres = (d: string) => vagas - ocupadasNoDia(e.tipo, abertas, null, d, agora, mens, horarioDaCreche(petshop)) - (usadas.get(`${e.tipo}:${d}`) ?? 0);
     const cheioEm = dias.find((d) => livres(d) <= 0) ?? null;
     if (cheioEm == null) {
       // entrou na lista com vaga: não ocupa a vaga de quem estava esperando um dia cheio, nem vira aviso

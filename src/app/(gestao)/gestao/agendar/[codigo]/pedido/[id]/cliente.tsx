@@ -6,7 +6,8 @@ import { CalendarCheck, CalendarClock, CalendarPlus, CalendarX, Clock, Hourglass
 import { configurado } from "@/lib/gestao/supabase-config";
 import { adiantarBanco, bancoDepois as banco } from "@/lib/gestao/supabase-depois";
 import { Marca } from "@/components/gestao/marca";
-import { dataLonga, deIsoDia, hora as horaDe, horarioDoDia, isoDia, linkWhatsApp, nomeDia, nomeDiaCurto, somaDias } from "@/lib/gestao/util";
+import { dataLonga, deIsoDia, hora as horaDe, isoDia, linkWhatsApp, nomeDia, nomeDiaCurto, somaDias } from "@/lib/gestao/util";
+import { horarioDoServico, janelaDoDia } from "@/lib/gestao/horario-loja";
 import { enderecoDaLoja, enderecoEmLinha, linkDoMapa } from "@/lib/gestao/endereco";
 import { comDesconto, lerVisto, partesPorExtenso, portePorExtenso, real, totalPorExtenso, valorPorExtenso, type LinhaDeValor } from "@/lib/gestao/link-precos";
 import { icsDaAgenda } from "@/lib/gestao/ics";
@@ -29,7 +30,7 @@ type Pedido = {
   endereco?: string | null; bairro?: string | null; complemento?: string | null; cidade?: string | null; uf?: string | null;
 };
 /** O que a página precisa do link para oferecer outro horário (link_info e link_fechados). */
-type Agenda = { hoje: string; horario: unknown; fechados: Set<string> };
+type Agenda = { hoje: string; horario: unknown; horarios: unknown[]; fechados: Set<string> };
 const DIAS_PARA_MUDAR = 14;
 /** O que o tutor pode fazer com o pedido (vem de `link_pedido_cliente`; só existe quando quem recebe o pedido ligou a opção). */
 type Acoes = {
@@ -179,13 +180,16 @@ export default function AcompanharPedido({ codigo, id, inicial }: { codigo: stri
     let vale = true;
     void Promise.all([banco().rpc("link_info", { p_codigo: codigoDoLink }), banco().rpc("link_fechados", { p_codigo: codigoDoLink })]).then(([i, f]) => {
       if (!vale) return;
-      const x = i.data as { hoje?: unknown; horario?: unknown } | null;
+      const x = i.data as { hoje?: unknown; horario?: unknown; servicos?: { id: string; horario?: unknown }[] } | null;
+      // cada serviço no horário próprio (ou no do pet shop): o dia novo precisa ser um dia em que todos funcionam
+      const lista = Array.isArray(x?.servicos) ? x!.servicos : [];
+      const horarios = [servicoParaMudar, ...extrasParaMudar].map((id) => horarioDoServico(lista.find((s) => s.id === id), x?.horario));
       // link desligado ou sem leitura: fica só o recado escrito, como sempre foi
-      setAgenda(!i.error && x && typeof x.hoje === "string" ? { hoje: x.hoje, horario: x.horario, fechados: new Set(Array.isArray(f.data) ? (f.data as unknown as string[]) : []) } : null);
+      setAgenda(!i.error && x && typeof x.hoje === "string" ? { hoje: x.hoje, horario: x.horario, horarios, fechados: new Set(Array.isArray(f.data) ? (f.data as unknown as string[]) : []) } : null);
     }, () => { if (vale) setAgenda(null); });
     return () => { vale = false; };
-  }, [painel, servicoParaMudar, agenda, codigoDoLink]);
-  const diasParaMudar = agenda ? Array.from({ length: DIAS_PARA_MUDAR }, (_, n) => somaDias(deIsoDia(agenda.hoje), n)).map((d) => ({ iso: isoDia(d), data: d, aberto: !!horarioDoDia(agenda.horario, d) && !agenda.fechados.has(isoDia(d)) })) : [];
+  }, [painel, servicoParaMudar, agenda, codigoDoLink]); // eslint-disable-line react-hooks/exhaustive-deps
+  const diasParaMudar = agenda ? Array.from({ length: DIAS_PARA_MUDAR }, (_, n) => somaDias(deIsoDia(agenda.hoje), n)).map((d) => ({ iso: isoDia(d), data: d, aberto: !!janelaDoDia(agenda.horarios, d.getDay()) && !agenda.fechados.has(isoDia(d)) })) : [];
   useEffect(() => {
     if (!diaNovo || !servicoParaMudar) return;
     let vale = true;

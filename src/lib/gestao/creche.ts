@@ -8,6 +8,7 @@ import { multaSugerida, opcoesDeCobranca } from "./dinheiro-opcoes";
 import { opcao } from "./opcoes";
 import { pixDe } from "./hotel-opcoes";
 import { brl, centavos, dataCompleta, dataCurta, deIsoDia, horarioDoDia, isoDia, nomeMes, somaDias } from "./util";
+import { horarioDaCreche } from "./horario-loja";
 
 /**
  * Creche com mensalistas: plano por pet (dias fixos da semana), chamada do dia, dias extras e cobrança do mês.
@@ -419,7 +420,7 @@ export function mensagemDeFalta(tutor: string | null | undefined, pet: string, s
  * O que a tela Hoje mostra da creche: quantos mensalistas são esperados hoje, quantos ainda não chegaram, quem faltou e,
  * para quem vê o financeiro, as mensalidades que vencem hoje e as atrasadas (as do mês corrente que faltam são criadas antes, sem duplicar).
  */
-export async function resumoDaCrecheHoje(sb: Banco, petshop: { id: string; horario: unknown }, vejoFinanceiro: boolean, liberado: boolean) {
+export async function resumoDaCrecheHoje(sb: Banco, petshop: { id: string; horario: unknown; horario_creche?: unknown }, vejoFinanceiro: boolean, liberado: boolean) {
   const hoje = isoDia(new Date());
   // os planos, o calendário (dia marcado como fechado: a chamada não espera ninguém) e o movimento de hoje ao mesmo tempo:
   // no celular com internet fraca, cada espera em fila soma uma ida e volta
@@ -431,7 +432,7 @@ export async function resumoDaCrecheHoje(sb: Banco, petshop: { id: string; horar
   if (!planos.length) return null;
   const mov = lido ?? await lerPresencas(sb, petshop.id, hoje, hoje);
   // quem veio fora do dia (dia extra, reposição) não é "esperado", mas conta em "na casa" e "já saíram", como na Chamada
-  const todas = montarChamada(planos, hoje, mov.presencas, mov.faltas, petshop.horario);
+  const todas = montarChamada(planos, hoje, mov.presencas, mov.faltas, horarioDaCreche(petshop));
   const linhas = todas.filter((l) => l.conta === "plano" || l.conta === "avulsa" || l.presenca?.status === "reservada");
   let vencemHoje = 0, atrasadas = 0, reposicoes = 0;
   const semValor: string[] = [];

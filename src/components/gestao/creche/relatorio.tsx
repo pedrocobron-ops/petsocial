@@ -1,5 +1,6 @@
 "use client";
 
+import { horarioDaCreche } from "@/lib/gestao/horario-loja";
 import Link from "@/components/gestao/link-depois";
 import { CalendarCheck2, CalendarDays, HandCoins, Sparkles, Sun, UserX } from "lucide-react";
 import {
@@ -81,7 +82,7 @@ export default function CrecheNoRelatorio({ de, ate }: { de: Date; ate: Date }) 
   const porDia = DIAS_SEMANA.map((d) => {
     let abertos = 0;
     for (let x = new Date(desde); isoDia(x) <= ateIso && isoDia(x) <= hoje; x = somaDias(x, 1)) {
-      if (x.getDay() === d.id && abreNoDia(petshop.horario, isoDia(x)) && !diaFechado(isoDia(x))) abertos++;
+      if (x.getDay() === d.id && abreNoDia(horarioDaCreche(petshop), isoDia(x)) && !diaFechado(isoDia(x))) abertos++;
     }
     const caes = vieram.filter((e) => deIsoDia(diaDe(e)).getDay() === d.id).length;
     return { ...d, abertos, caes, media: abertos ? Math.round((caes / abertos) * 10) / 10 : 0 };
