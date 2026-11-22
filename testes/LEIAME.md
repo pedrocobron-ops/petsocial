@@ -9,9 +9,11 @@ de datas fixas nem do dia da semana: as datas saem de "hoje" no fuso da loja e a
 ```bash
 # 1. Supabase local no ar, com todas as migrações (supabase/migrations) aplicadas
 npx supabase start            # contêiner supabase_db_petsocial; o .env.local aponta para ele
-#    O segundo fator (TOTP) precisa estar ligado no Auth local ([auth.mfa.totp] em supabase/config.toml, desde 20261245): sem ele, os
-#    testes do painel do administrador (B.adminForte, N.passarDoSegundoFator) quebram no cadastro do fator. Mudou o config.toml?
-#    `npx supabase stop && npx supabase start` (o Auth só lê na subida).
+#    O painel do administrador abre com a senha do painel (migração 20261247). Os testes usam B.adminAberto(sb) (cliente da API)
+#    e N.ir / N.abrirOPainel (navegador), com a senha de teste B.SENHA_PAINEL. O link por e-mail é lido no Mailpit do Supabase
+#    local (http://127.0.0.1:54324, MAILPIT_URL): banco/senha-do-painel.js e telas/senha-do-painel.js precisam dele no ar.
+#    O Auth local só devolve o link para o endereço pedido quando a máquina é 127.0.0.1 (a do site_url): rode esses dois com
+#    BASE_URL=http://127.0.0.1:<porta> (com localhost, a tela é testada igual, com a volta do link montada pelo teste).
 
 # 2. Build e servidor (outra aba). GESTAO_LINK_IA_FALSO=1: o "Tirar dúvidas do link" responde sem chamar o modelo.
 #    GESTAO_ERRO_TESTE=1: liga o gatilho de erro de propósito (tela Hoje com ?__erro_teste=…, rota /api/gestao/erro-teste).
@@ -83,7 +85,8 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `loja-negocios-site.js`: os 6 manuais pagos da linha de negócios (os mesmos produtos da Cakto que os materiais pagos da Escola) fora do site com `MATERIAIS_PAGOS_A_VENDA` desligado (`foraDoSite`, `noSite`, `manuaisNoSite`, `lojaNegociosNoSite` em `produtos.ts`): vitrine vazia, nenhuma indicação de manual, sitemap sem /negocios; os guias para tutores continuam; ligada, os 6 voltam. As telas (página de venda com 404, /negocios levando à página inicial, topo, rodapé, página inicial, Quem faz, termos) leem a mesma chave. Sem banco.
 - `abertura-admin-escola.js`: a abertura tenta mais uma vez, quieta, quando o banco demora ou a rede pisca (`abertura.ts`: `comUmaTentativaAMais`, `erroPassageiro`; sem permissão ou PGRST116 não repete; tela fechada não repete); `lerBase` com o banco demorando sobe o erro sem ler em pedaços; aviso de demora aos 12 s; nenhum `.single()` na abertura; materiais pagos da Escola fora da estante e do manual com `MATERIAIS_PAGOS_A_VENDA` desligado (`escola-venda.ts`), e de volta com ela ligada. Sem banco.
 - `link-tutor.js`: rodada 9 (N7), o que o tutor vê: valor por pet e total (`link-precos.ts`: porte P e porte G com 15% = 42,41 + 76,41 = 118,82, faixa sem porte, o que o banco guardou), endereço e link do mapa (`endereco.ts`), "Adicionar à agenda" (`ics.ts`), Tirar dúvida com promoções, endereço e resposta pela metade (`link-ia.ts`), abertura do link numa ida só também pelo navegador (`link-inicial.ts`) e a confirmação com o endereço.
-- `seguranca-reforcos.js` (migração 20261245): a regra de conteúdo que VALE no aplicativo e no painel (`csp.ts`: script só do site e com o nonce da página, `script-src-attr 'none'`, sem `'unsafe-inline'` no script, sem pixel nem Cakto, Supabase em https e wss; nonce novo a cada vez); só `/gestao/app` e `/gestao/admin` têm a regra (middleware) e o `next.config.ts` não manda a "só avisando" para elas; quem abriu a página fora do aplicativo recarrega ao entrar (`precisaRecarregar`); os scripts em linha da abertura com o nonce; o leitor de PDF sem testar `eval`; a logo pela rota `/gestao/marca/…` (`logoDaLoja`, só caminho de logo) e ninguém montando o endereço público do bucket `pets`; o painel pergunta `admin_situacao` e mostra o segundo fator (Supabase Auth MFA); TOTP ligado no `config.toml`.
+- `seguranca-reforcos.js` (migração 20261245): a regra de conteúdo que VALE no aplicativo e no painel (`csp.ts`: script só do site e com o nonce da página, `script-src-attr 'none'`, sem `'unsafe-inline'` no script, sem pixel nem Cakto, Supabase em https e wss; nonce novo a cada vez); só `/gestao/app` e `/gestao/admin` têm a regra (middleware) e o `next.config.ts` não manda a "só avisando" para elas; quem abriu a página fora do aplicativo recarrega ao entrar (`precisaRecarregar`); os scripts em linha da abertura com o nonce; o leitor de PDF sem testar `eval`; a logo pela rota `/gestao/marca/…` (`logoDaLoja`, só caminho de logo) e ninguém montando o endereço público do bucket `pets`.
+- `senha-do-painel.js` (migração 20261247): a leitura de `admin_situacao` (`lerSituacao` em `senha-do-painel.ts`; a resposta de antes, com `forte`, não vale), as regras da senha nova iguais às do banco (10 a 200, diferente do e-mail, as duas iguais), os textos da porta (senha errada com as tentativas que restam, trava com os minutos e o horário, e-mail disfarçado); o painel pergunta `admin_situacao`, mostra a porta antes dos dados, tira os dados da tela ao fechar e tem o "Fechar o painel"; a senha não vai para armazenamento nem registro de erros; o segundo fator saiu (sem a tela, sem `auth.mfa`, sem `sessao_forte`, TOTP desligado no `config.toml`); a migração (só hash bcrypt custo 12, `session_id` do token, tabelas sem permissão para os papéis da API, nenhum erro leva a senha, 5 erros / 15 min / 12 h).
 - `seguranca-rodada9.js`: célula de planilha segura (`celulaCsv` em `csv.ts`: fórmula vira texto) e o uso dela na exportação dos aceites; `next.config.ts` com os cabeçalhos de segurança em todas as páginas; **`npm audit --omit=dev --audit-level=high`** sem alerta alto ou crítico (sem internet vira problema conhecido, não derruba).
 - `caixa-trava-recibos.js`: rodada 9 (N5): comprovante do hotel com o sinal recebido na saída (110,40 + 282,60 = 393,00 = Crédito 2x 200,00 + Pix 193,00; `totalPagoAgora`, `fechoDaConta`), parcelas, troco, hora e quem atendeu nos comprovantes (`formasComValor`, `linhaDeQuem`), comprovante da conta para depois (`textoComprovanteAReceber`), recibo da conta paga (`textoReciboDeConta`: 15,00 + 0,34 = 15,34), troca e devolução (`textoComprovanteDevolucao`: 29,99 por 34,90, diferença 4,91), frases do fiado (`fraseDoLimite`, `fraseDoQueDeve`), Caixa no menu no modo simples e "Conta anterior" na cobrança.
 - `equipe-chao.js`: rodada 9 (N6), a equipe do chão e os cuidados do hotel: dose na hora, atrasada ou depois (`situacaoDaDose`, `dosesDeAgora`), ficha de cuidados e ocorrências ligadas por padrão (`hotel.sem_cuidados`, `casa.sem_ocorrencias`), texto livre que fala de remédio (`falaDeRemedio`), atalhos de chegada que entram no Conferir a entrada (`entradaPelosAtalhos`), ordem do Meus pets de hoje, alerta curto, "Cannot coerce…" em português e as áreas das ferramentas do Mozart do chão.
@@ -238,11 +241,19 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   de A; nada pode trazer a marca posta nos dados de A (nome, e-mail, endereço, R$ 7.777,77) e o retrato dos dados de A tem de
   ficar igual. Anônimo que lê qualquer linha de qualquer tabela derruba o teste (catálogo público de propósito entra em `PUBLICAS`).
   Ficam fora da chamada (lista `PULA`): funções que apagam a conta de quem chama, criam loja, do painel e as que só contam uso.
-- `seguranca-reforcos.js` (migração 20261245; precisa do servidor e do TOTP ligado no Auth local): painel do administrador com o
-  segundo fator (com a senha só, aal1: `sou_admin()` false, todas as `admin_*` recusadas e a rota da cópia completa 403;
-  `admin_situacao` diz admin e não forte; com o fator TOTP cadastrado e um código conferido — gerado no teste pelo segredo, `B.totp` —
-  a sessão vira aal2 e tudo responde; outro aparelho com a senha certa é recusado até o código; código errado não passa; nenhuma
-  função fora do painel usa `sou_admin()`); IA do teste grátis (teto próprio dos pet shops em teste, um quarto do geral: Mozart,
+- `senha-do-painel.js` (migração 20261247; precisa do servidor e do Mailpit do Supabase local): admin sem senha não abre nada
+  (`sou_admin()` false, todas as `admin_*` chamadas uma a uma e recusadas, rota da cópia completa 403, Escola sem escrita);
+  `admin_senha_definir` só com a chegada pelo link do e-mail (o token traz `amr` com `otp` e a hora): recusa com a sessão da senha
+  da conta e com a chegada de 16 minutos (a hora fica na sessão e vai para o token renovado), aceita com 14; senha curta, só de
+  espaços, longa ou igual ao e-mail recusadas; no banco só o hash bcrypt custo 12; `admin_painel_abrir`: senha errada conta, a
+  quinta trava por 15 minutos (nem a certa abre; vale em qualquer login do usuário; 8 pedidos juntos contam 4), a trava passa, a
+  certa zera; abre só para o `session_id` do token (outro login começa fechado; linha com a sessão de outro usuário não vale;
+  parâmetro de sessão no pedido é recusado); vencimento; `admin_painel_fechar`; sair da conta fecha na hora (o token antigo, ainda
+  no prazo, não abre); trocar a senha fecha as sessões abertas, zera o freio e a antiga não vale; e-mail da conta trocado: a troca
+  por e-mail é recusada (`email_trocado`) até abrir uma vez com a senha atual; quem não é admin recebe a mesma
+  resposta no mesmo tempo, trava igual e não registra senha nem chegando pelo e-mail; o hash não sai (tabelas sem leitura para
+  anônimo, dono, admin e chave de serviço; respostas sem hash; cópia completa sem as três tabelas); sair de `admins` apaga tudo.
+- `seguranca-reforcos.js` (migração 20261245; precisa do servidor): IA do teste grátis (teto próprio dos pet shops em teste, um quarto do geral: Mozart,
   Ajuda, boletim e caderno param com "geral" e o pet shop que paga continua; dono sem o e-mail confirmado: "email", nada contado;
   provado, volta; pagando, não depende); IP dos aceites (`boletim_autorizar` sem o segredo ignora `x-maestro-ip`/`-navegador`
   forjados e grava o IP que o banco vê; pela rota do servidor com a trava, o IP e o navegador do tutor; `aceitar_documentos` grava o
@@ -678,9 +689,16 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   descartado. Em todas: sem rolagem para o lado, sem erro de console e sem violação da regra de conteúdo (CSP).
 - `loja-negocios-site.js`: manuais de negócio fora do site: /negocios leva à página inicial, as 6 páginas de venda dão 404 e saem do sitemap; nenhum link para /negocios no topo, menu do celular, rodapé (sem a coluna Manuais), página inicial (duas portas: /tutor e /gestao), Quem faz, termos, /tutor e página de guia; guias e /gestao no ar. 390 e 1366, capturas em `testes/saida/loja-negocios-*.png`.
 - `abertura-admin-escola.js`: abertura com a primeira resposta da conta ou do pet shop cortada por demora (ou rede caindo): o aplicativo abre sozinho, sem "Opa, algo não carregou" nem "Ainda buscando…"; falhando sempre, a tela de erro com "Tentar de novo" (duas tentativas, não mais). Painel do administrador: o primeiro quadro depois de tocar uma aba já é a aba nova carregando, nunca o conteúdo da anterior. Conta de teste marcada e desmarcada na folha do pet shop (sai de "Todos" e dos números). Escola sem material pago para o cliente (sem preço, "Comprar" nem "em breve") e o painel com "Escondido da loja até ter PDF e o aviso de pagamento". 390 e 1366.
-- `seguranca-reforcos.js` (migração 20261245, 390 e 1366): painel do administrador sem fator mostra o QR code (data:) e o código de
-  texto; código errado avisa "não confere"; o código certo (gerado pelo segredo lido da tela) abre o painel e o fator fica conferido no
-  Auth; outro aparelho com a senha certa pede o código (sessão aal1) antes do painel. O painel e o aplicativo mandam a regra de
+- `senha-do-painel.js` (migração 20261247, 390 e 1366; precisa do Mailpit do Supabase local): admin sem senha vê a porta com o
+  "Receber o link por e-mail" (e-mail disfarçado, nada do painel); o link chega no Mailpit e traz de volta para "Escolha a senha do
+  painel" (endereço limpo); senha curta, senhas diferentes e senha igual ao e-mail são avisadas; a senha boa abre o painel; "Fechar o
+  painel" volta para a porta sem sair da conta e os dados saem da tela; senha errada diz quantas tentativas restam; a quinta trava
+  (campo e botão parados, aviso com os minutos e o horário; recarregar não tira); passada a trava, a certa abre; recarregar com o
+  painel aberto não pede a senha; outro login pede a senha do painel e o banco recusa `admin_painel` a ele; a troca pelo e-mail
+  ("Escolha a senha nova") abre no aparelho que trocou e fecha no outro (volta para a porta ao atualizar; a senha antiga não abre);
+  código do e-mail errado avisa; quem não é admin vê a página de sempre, sem porta e sem a palavra senha; nenhuma violação da regra
+  de conteúdo, nenhum erro de console fora dos esperados e sem rolagem lateral.
+- `seguranca-reforcos.js` (migração 20261245, 390 e 1366): o painel (aberto com a senha de teste) e o aplicativo mandam a regra de
   conteúdo que vale (nonce novo a cada página, sem `'unsafe-inline'` no script, sem a "só avisando") e **nenhum `securitypolicyviolation`**
   no painel (as 10 abas) e em 17 telas do aplicativo nas duas larguras; controle: um script em linha sem nonce e um `onerror=""` não
   rodam e o vigia vê as violações. A foto do pet aparece na ficha pelo endereço assinado do Supabase. Da capa com os cookies aceitos (o
@@ -977,15 +995,28 @@ freios antigos, reservas do caderno) também roda pelo pg_cron (`gestao-faxina-d
 Para testar a rota à mão: `curl -H "x-gestao-faxina: <segredo>" https://…/api/gestao/faxina` (devolve só quantidades).
 A mesma faxina apaga as contas com o prazo de "Encerrar e apagar a conta" vencido (pet shop, arquivos e os logins do Maestro que
 ficaram sem pet shop) e os arquivos da fila da LGPD. A **cópia completa** do painel do administrador (`/api/gestao/admin/copia`)
-também usa `SUPABASE_SERVICE_ROLE_KEY` (sem ela, 503); só passa quem `sou_admin` diz que é admin (com o segundo fator, abaixo).
+também usa `SUPABASE_SERVICE_ROLE_KEY` (sem ela, 503); só passa quem `sou_admin` diz que é admin (com o painel aberto, abaixo).
 
-**Segundo fator do administrador (migração 20261245).** `sou_admin()` só diz sim com a sessão aal2 (código do aplicativo
-autenticador): todas as `admin_*`, as regras da Escola e a cópia completa dependem dela. No primeiro acesso a `/gestao/admin`, a tela
-mostra o QR code e o código de texto para cadastrar no Google Authenticator (ou outro) e pede o primeiro código; depois, pede o código
-a cada sessão nova. O cadastro e a conferência são do Supabase Auth: ligue o TOTP no painel do Supabase (Authentication →
-Multi-Factor → TOTP, normalmente já ligado no Supabase da nuvem). Perdeu o celular: alguém com acesso ao banco apaga o fator
-(`delete from auth.mfa_factors where user_id = (select id from auth.users where email = '<e-mail do admin>');`) e a pessoa cadastra
-de novo na próxima entrada no painel.
+**Senha do painel do administrador (migração 20261247, no lugar do segundo fator de 20261245).** `sou_admin()` só diz sim para quem
+está em `admins` e abriu o painel nesta sessão de login com a senha do painel (`admin_painel_abrir`): todas as `admin_*`, as regras
+da Escola e a cópia completa dependem disso. A senha é separada da senha da conta; no banco fica só o hash (bcrypt), em
+`admin_senhas`, que ninguém lê pela API (nem a chave de serviço, nem a cópia completa). O painel fica aberto por 12 horas naquela
+sessão de login (`admin_painel_sessoes`, presa ao `session_id` do token); outro aparelho ou entrar de novo pede a senha outra vez;
+"Fechar o painel" fecha sem sair da conta; sair da conta fecha na hora. Cinco senhas erradas seguidas travam as tentativas daquele
+usuário por 15 minutos (`admin_senha_tentativas`).
+Registrar e trocar a senha é só pelo e-mail: na porta, "Receber o link por e-mail" manda o e-mail de entrada do Supabase Auth
+(`signInWithOtp`, o mesmo da Escola) com a volta para `/gestao/admin`; quem chega pelo link (ou digita o código do e-mail, se o
+modelo de e-mail do projeto mostrar código) tem 15 minutos para escolher a senha (`admin_senha_definir` confere no token o método
+`otp` e a hora). Trocar a senha fecha os painéis abertos e zera a trava. A senha fica ligada ao e-mail da conta de quando foi
+registrada: se o e-mail da conta mudar depois, a troca por e-mail é recusada até o painel abrir uma vez com a senha atual (assim,
+quem só tem a senha da conta não troca o e-mail para receber o link). No Supabase, deixe ligado o "Secure email change"
+(Authentication → Sign In / Providers → Email), que pede a confirmação também no e-mail antigo. No painel do Supabase: Authentication → URL Configuration
+com o Site URL em `https://maestropet.com` (a volta do link para o mesmo endereço do site já é aceita; se o site abrir por outro
+endereço, ponha `https://<endereço>/gestao/admin` em Redirect URLs); Authentication → Emails → "Magic Link" com o link
+(`{{ .ConfirmationURL }}`) ou o código (`{{ .Token }}`); login por telefone (SMS) desligado, porque o código por SMS também sai
+como `otp`. Tirar a senha de alguém (ex.: saiu da equipe): `delete from admins where user_id = …` apaga a senha e fecha os painéis.
+O segundo fator (TOTP) não é mais usado: o `config.toml` local voltou a deixá-lo desligado, e o fator que o dono cadastrou no Auth
+de produção pode ficar (não faz nada) ou ser apagado (`delete from auth.mfa_factors where user_id = …`).
 
 **IA no teste grátis (migração 20261245).** Os pet shops em teste têm um teto geral próprio por dia, para não esgotar o de quem
 paga: `mozart_dia_geral_teste`, `ajuda_dia_geral_teste`, `boletim_dia_geral_teste`, `link_ia_dia_geral_teste`,

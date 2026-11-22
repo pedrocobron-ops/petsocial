@@ -45,6 +45,7 @@ export async function copiaCompleta(sb: Banco, enviar: (b: Uint8Array) => void, 
       "Arquivos do Storage (fotos dos pets, do boletim e do diário, logos, PDFs).",
       "Códigos de acesso das páginas públicas e assinaturas de link (colunas_fora de cada tabela).",
       "Chaves com nome de segredo dentro de campos JSON e as linhas de segredo da config_interna.",
+      "A senha do painel do administrador e as tentativas dela (só o hash existe, e ele não sai do banco).",
     ],
   };
   const de = sb as unknown as { from: (t: string) => { select: (c: string) => { order: (c: string) => unknown } } };

@@ -58,7 +58,7 @@ const clienteCom = (ip, nav = NAV) => createClient(B.SUPABASE_URL, B.SUPABASE_KE
   B.must(await adm.auth.signUp({ email: emailAdm, password: SENHA, options: B.dadosDoCadastro() }), 'cadastro do admin');
   const uidAdm = (await adm.auth.getUser()).data.user.id;
   B.sql(`insert into admins (user_id) values ('${uidAdm}') on conflict do nothing`);
-  await B.adminForte(adm); // o painel só responde com o segundo fator (aal2, migração 20261245)
+  await B.adminAberto(adm); // o painel só responde depois da senha do painel (migração 20261247)
   T.depois(() => B.sql(`delete from admins where user_id='${uidAdm}'`));
   const lidos = B.must(await adm.rpc('admin_registros_acesso', { p_email: L.emails.dono.toUpperCase() }), 'admin lê');
   T.ok('o admin lê os acessos do dono (pelo e-mail, sem diferença de maiúsculas), com IP e navegador', lidos.length === 1 && lidos[0].ip === ip && lidos[0].navegador === NAV && lidos[0].email === L.emails.dono, lidos);

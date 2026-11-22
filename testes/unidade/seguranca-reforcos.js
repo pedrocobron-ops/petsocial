@@ -3,7 +3,7 @@
 //     pixel nem Cakto, o Supabase (https e wss) na lista; nonce novo a cada vez; quais páginas recarregam ao entrar;
 //   - next.config.ts não manda a regra "só avisando" para /gestao/app e /gestao/admin (o middleware manda a que vale);
 //   - a logo do pet shop pela rota do site (logoDaLoja): só caminho de logo, nunca o endereço público do bucket;
-//   - ninguém mais monta o endereço público do bucket `pets`; o painel pergunta admin_situacao e mostra o segundo fator.
+//   - ninguém mais monta o endereço público do bucket `pets`.
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
@@ -61,12 +61,5 @@ const ler = (c) => fs.readFileSync(path.join(B.RAIZ, c), 'utf8');
     andar(path.join(B.RAIZ, 'src'));
     assert.deepEqual(achados, []);
   });
-
-  T.secao('painel do administrador');
-  const pag = ler('src/app/(gestao)/gestao/admin/page.tsx');
-  t('o painel pergunta admin_situacao e mostra o segundo fator antes dos dados', () => { assert.match(pag, /rpc\("admin_situacao"\)/); assert.match(pag, /setAcesso\("fator"\)/); assert.match(pag, /<SegundoFator /); });
-  const sf = ler('src/components/gestao/admin/segundo-fator.tsx');
-  t('o segundo fator usa o Supabase Auth (enroll, challengeAndVerify, listFactors)', () => { for (const f of ['mfa.enroll(', 'mfa.challengeAndVerify(', 'mfa.listFactors(']) assert.ok(sf.includes(f), f); });
-  t('o menu mostra "Administrador" pela situação (antes do código)', () => assert.match(ler('src/components/gestao/casca.tsx'), /rpc\("admin_situacao"\)/));
-  t('o TOTP ligado no Supabase local', () => assert.match(ler('supabase/config.toml'), /\[auth\.mfa\.totp\]\nenroll_enabled = true\nverify_enabled = true/));
+  // o painel do administrador: a senha do painel (unidade/senha-do-painel.js)
 }))();

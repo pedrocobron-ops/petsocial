@@ -50,29 +50,29 @@ async function fecharAvisos(page) {
   }
 }
 /**
- * Painel do administrador com o segundo fator (migração 20261245): se a página pede o código, digita o código TOTP do segredo
- * desta execução (B.segredosMfa, pelo usuário da tela); se pede o cadastro, lê o código de texto da tela, guarda e confere.
- * Devolve 'cadastro', 'codigo' ou null (a tela não pediu nada).
+ * Painel do administrador com a senha do painel (migração 20261247): se a página mostra a porta, digita a senha de teste
+ * (B.SENHA_PAINEL) e abre. Admin de teste ainda sem senha: registra a de teste direto no banco (B.registrarSenhaDoPainel) e
+ * recarrega. Devolve 'abriu' ou null (a tela não pediu nada).
  */
-async function passarDoSegundoFator(page, seletor = '.g-adm-abas, .g-vazio') {
-  const mfa = page.locator('[data-teste=mfa-cadastro], [data-teste=mfa-codigo-pedido]').first();
-  await Promise.race([mfa.waitFor({ timeout: 30000 }), page.waitForSelector(seletor, { timeout: 30000 })]).catch(() => {});
-  if (!(await mfa.isVisible().catch(() => false))) return null;
-  const uid = await page.locator('[data-teste=mfa]').getAttribute('data-usuario');
-  const cadastro = (await mfa.getAttribute('data-teste')) === 'mfa-cadastro';
-  if (cadastro) B.segredosMfa.set(uid, (await page.locator('[data-teste=mfa-segredo]').innerText()).trim());
-  const segredo = B.segredosMfa.get(uid);
-  if (!segredo) throw new Error('o painel pede o código do segundo fator e este teste não conhece o segredo (B.adminForte antes)');
-  await page.fill('[data-teste=mfa-codigo]', B.totp(segredo));
-  await page.locator('[data-teste=mfa] button[type=submit]').click();
+async function abrirOPainel(page, seletor = '.g-adm-abas, .g-vazio', senha = B.SENHA_PAINEL) {
+  const porta = page.locator('[data-teste=painel-porta]').first();
+  await Promise.race([porta.waitFor({ timeout: 30000 }), page.waitForSelector(seletor, { timeout: 30000 })]).catch(() => {});
+  if (!(await porta.isVisible().catch(() => false))) return null;
+  if ((await porta.getAttribute('data-modo')) !== 'abrir') {
+    B.registrarSenhaDoPainel(await porta.getAttribute('data-usuario'), senha);
+    await page.reload();
+    await page.locator('[data-teste=painel-porta][data-modo=abrir]').waitFor({ timeout: 30000 });
+  }
+  await page.fill('[data-teste=painel-senha]', senha);
+  await page.locator('[data-teste=painel-abrir] button[type=submit]').click();
   await page.waitForSelector(seletor, { timeout: 30000 });
-  return cadastro ? 'cadastro' : 'codigo';
+  return 'abriu';
 }
 
-/** Abre uma rota e espera a tela assentar (rede quieta, com teto). No painel do administrador, passa do segundo fator. */
+/** Abre uma rota e espera a tela assentar (rede quieta, com teto). No painel do administrador, abre com a senha do painel. */
 async function ir(page, rota, seletor = '.g-main') {
   await page.goto(B.BASE_URL + rota);
-  if (/^\/gestao\/admin/.test(rota)) await passarDoSegundoFator(page, seletor || '.g-adm-abas, .g-vazio');
+  if (/^\/gestao\/admin/.test(rota)) await abrirOPainel(page, seletor || '.g-adm-abas, .g-vazio');
   if (seletor) await page.waitForSelector(seletor, { timeout: 30000 });
   await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
   await page.waitForTimeout(400);
@@ -92,4 +92,4 @@ async function doAlto(page, nome, papel = 'button') {
 }
 const rolagemLateral = (page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 
-module.exports = { passarDoSegundoFator, playwright, abrirNavegador, fecharNavegador, contexto, entrar, fecharAvisos, ir, doAlto, rolagemLateral, IGNORAR };
+module.exports = { abrirOPainel, playwright, abrirNavegador, fecharNavegador, contexto, entrar, fecharAvisos, ir, doAlto, rolagemLateral, IGNORAR };

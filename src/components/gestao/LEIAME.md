@@ -219,6 +219,9 @@ use `categoriaAtual(categoria, petshop)` (Financeiro, Caixa, contas). Áreas da 
 O manual troca sozinho (`textoDaCasa` em `manual.ts`). Interruptor (`role="switch"`) sempre com `aria-label` ou texto dentro.
 
 ## Painel do administrador (`/gestao/admin`, só `sou_admin()`)
+- Porta: `admin/senha-do-painel.tsx` (senha do painel, migração 20261247). A página pergunta `admin_situacao` e só carrega os dados
+  com o painel aberto nesta sessão de login (`admin_painel_abrir`); "Fechar o painel" chama `admin_painel_fechar`. Registrar e trocar
+  a senha: só chegando pelo link do e-mail (`admin_senha_definir`). Textos e regras em `src/lib/gestao/senha-do-painel.ts`.
 - Abas: Visão geral (`admin/visao.tsx`, função `admin_visao_geral`), Uso (`admin/uso.tsx`, `admin_uso` + `admin_uso_contas`, sinais em `sinaisDe`),
   Contas (lista de `admin_painel`; a folha usa `admin/conta.tsx` com `admin_conta`: histórico e mensagens prontas), Conversas, Escola, Cakto.
 - Regra: o painel recebe só dados da conta e quantidades. Nada de nome/telefone de cliente, pets ou valores do pet shop. Função nova de admin

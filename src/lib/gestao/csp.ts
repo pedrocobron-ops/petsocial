@@ -6,7 +6,7 @@
  * avisando" do next.config.ts, que deixa o pixel da Meta e a Cakto.
  *
  * O que o aplicativo usa de fora: o Supabase (dados, fotos assinadas, tempo real por wss). Fotos da câmera e prévias são
- * blob:/data:; o QR code do segundo fator é data:; o leitor de PDF usa um worker deste site.
+ * blob:/data:; o leitor de PDF usa um worker deste site.
  */
 export const ROTAS_COM_CSP = /^\/gestao\/(app|admin)(\/|$)/;
 

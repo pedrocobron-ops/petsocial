@@ -6,8 +6,8 @@ import { comRegistro, registrarErroServidor } from "@/lib/gestao/erros-servidor"
 /**
  * "Baixar cópia completa" do painel do administrador: um .zip com todas as tabelas do banco em JSON (sem logins, senhas,
  * arquivos e segredos; ver copia-completa.ts), mandado aos poucos. Quem pede manda o próprio login (Authorization: Bearer);
- * só passa quem o banco diz que é admin (sou_admin, que exige a sessão com o segundo fator: aal2, migração 20261245). A leitura usa a chave de serviço (SUPABASE_SERVICE_ROLE_KEY), que só o
- * servidor tem: sem ela, 503.
+ * só passa quem o banco diz que é admin (sou_admin, que exige o painel aberto com a senha do painel nesta sessão de login,
+ * migração 20261247). A leitura usa a chave de serviço (SUPABASE_SERVICE_ROLE_KEY), que só o servidor tem: sem ela, 503.
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
