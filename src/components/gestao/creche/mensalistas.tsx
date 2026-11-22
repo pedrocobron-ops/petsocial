@@ -1,5 +1,6 @@
 "use client";
 
+import { horarioDaCreche } from "@/lib/gestao/horario-loja";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarX2, ChevronDown, History, ListChecks, Pencil, Plus, Search } from "lucide-react";
 import { abreNoDia, DIAS_SEMANA, lerPresencas, planoAtivo, podeMudarPlano, resumoDoMes, taxiDe, type PlanoCompleto } from "@/lib/gestao/creche";
@@ -69,7 +70,7 @@ export default function Mensalistas({ planos: lidos, novo, aoAbrirNovo, aoFechar
   }, [petshop.id, planos.length, hoje]);
 
   // plano que terminou com a mensalidade do mês da saída ainda cheia (ou cobrança de mês em que ele já não vem): o acerto volta aqui
-  const { dados: saidas, recarregar: recarregarSaidas } = useDados(async () => (vejoFinanceiro ? lerSaidasParaAcertar(sb, petshop.id, planos, petshop.horario) : [] as SaidaParaAcertar[]),
+  const { dados: saidas, recarregar: recarregarSaidas } = useDados(async () => (vejoFinanceiro ? lerSaidasParaAcertar(sb, petshop.id, planos, horarioDaCreche(petshop)) : [] as SaidaParaAcertar[]),
     [petshop.id, vejoFinanceiro, planos.map((p) => `${p.id}:${p.fim ?? ""}`).join(",")]);
   const ativos = useMemo(() => planos.filter((p) => planoAtivo(p, hoje)), [planos, hoje]);
   const encerrados = planos.length - ativos.length;
@@ -99,7 +100,7 @@ export default function Mensalistas({ planos: lidos, novo, aoAbrirNovo, aoFechar
             </div>
             <div className="g-cm-ocupacao" role="list">
               {DIAS_SEMANA.map((d) => {
-                const n = porDia[d.id], fechado = !abreNoDia(petshop.horario, umDia(d.id));
+                const n = porDia[d.id], fechado = !abreNoDia(horarioDaCreche(petshop), umDia(d.id));
                 const cheio = vagas != null && n >= vagas;
                 return (
                   <div key={d.id} role="listitem" className={`g-cm-col${cheio ? " cheio" : ""}${fechado ? " fechado" : ""}`}>
@@ -126,7 +127,7 @@ export default function Mensalistas({ planos: lidos, novo, aoAbrirNovo, aoFechar
           {!lista.length ? <p className="g-muted g-centro" style={{ padding: "24px 8px" }}>Nenhum mensalista com esse nome.</p> : (
             <div className="g-cm-lista">
               {lista.map((p) => {
-                const r = mov ? resumoDoMes(p, agora, mov.presencas, mov.faltas, petshop.horario, hoje) : null;
+                const r = mov ? resumoDoMes(p, agora, mov.presencas, mov.faltas, horarioDaCreche(petshop), hoje) : null;
                 const aberta = aberto === p.id;
                 return (
                   <div key={p.id} className={`g-cm-plano${aberta ? " aberto" : ""}`}>

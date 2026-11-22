@@ -1,5 +1,6 @@
 "use client";
 
+import { horarioDaCreche } from "@/lib/gestao/horario-loja";
 import { useEffect, useState } from "react";
 import { AlertTriangle, Check } from "lucide-react";
 import {
@@ -129,7 +130,7 @@ export default function AcertoDaSaida({ plano, aoFechar }: { plano: PlanoComplet
   const atuais: Item[] = (dados?.cobrancas ?? []).filter((c) => c.status === "aberta" && !c.acerto_saida && !(c.obs ?? "").includes(notaDaSaida(fim))).flatMap((c): Item[] => {
     const recebido = centavos(Number(c.total) - (c.lancamentos?.pago ? 0 : faltaDaCobranca(c)));
     if (c.mes === mesFim) {
-      const s = sugestaoDoMes(plano, deIsoDia(c.mes), Number(c.valor_cheio), petshop.horario);
+      const s = sugestaoDoMes(plano, deIsoDia(c.mes), Number(c.valor_cheio), horarioDaCreche(petshop));
       if (!(s.valor < Number(c.valor_mensal))) return [];
       // o desconto combinado segue; o desconto para irmãos (opção da creche) é refeito sobre a mensalidade nova, como no banco
       const partes = partesDoDesconto(c), regra = regraIrmaoDe(petshop);
