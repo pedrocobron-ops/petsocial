@@ -40,7 +40,9 @@ const LIMITE_TEXTO = "Por hoje o Mozart já atendeu todos os pedidos que cabem n
 const LIMITE_GERAL_TEXTO = "O Mozart recebeu pedidos demais hoje, de todos os pet shops juntos, e precisou parar para descansar. Amanhã cedo ele volta. Enquanto isso, tudo funciona pelos botões das telas, e o Manual, no menu, explica cada passo.";
 /** Conta só para consulta (teste vencido, assinatura cancelada ou conta em exclusão): a IA custa a cada pergunta. */
 const FECHADO_TEXTO = "O Mozart atende quem está no teste grátis ou com a assinatura em dia. A sua conta está só para consulta: os dados continuam aqui, nas telas. Para voltar a usar o Mozart, veja a tela Assinatura.";
-const textoDoLimite = (motivo: string | null) => (motivo === "fechado" ? FECHADO_TEXTO : motivo === "geral" ? LIMITE_GERAL_TEXTO : LIMITE_TEXTO);
+/** Teste grátis com o e-mail do dono ainda não confirmado (assistente_contar_v2, motivo 'email', migração 20261245). */
+const EMAIL_TEXTO = "No teste grátis, o Mozart começa a atender depois que o e-mail do dono da conta é confirmado. Para confirmar, saia, toque em \"Esqueci a senha\" na tela de entrar e abra o link que chega no e-mail. Enquanto isso, tudo funciona pelos botões das telas.";
+const textoDoLimite = (motivo: string | null) => (motivo === "fechado" ? FECHADO_TEXTO : motivo === "email" ? EMAIL_TEXTO : motivo === "geral" ? LIMITE_GERAL_TEXTO : LIMITE_TEXTO);
 
 type Bloco = Record<string, unknown>;
 const ehTexto = (v: unknown, max = 8000) => typeof v === "string" && v.length <= max;

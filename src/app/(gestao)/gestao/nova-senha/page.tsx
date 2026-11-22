@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Porta from "@/components/gestao/porta";
 import { banco } from "@/lib/gestao/supabase";
 
 export default function NovaSenha() {
-  const router = useRouter();
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [pronto, setPronto] = useState(false);
@@ -33,7 +31,7 @@ export default function NovaSenha() {
     // Nada disso segura a entrada se falhar.
     try { await banco().rpc("email_provar"); } catch { /* segue */ }
     try { await banco().auth.signOut({ scope: "others" }); } catch { /* segue */ }
-    router.replace("/gestao/app");
+    window.location.replace("/gestao/app");
   }
 
   return (

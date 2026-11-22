@@ -48,9 +48,30 @@ async function fecharAvisos(page) {
     await x.click().catch(() => {}); await page.waitForTimeout(600);
   }
 }
-/** Abre uma rota e espera a tela assentar (rede quieta, com teto). */
+/**
+ * Painel do administrador com o segundo fator (migração 20261245): se a página pede o código, digita o código TOTP do segredo
+ * desta execução (B.segredosMfa, pelo usuário da tela); se pede o cadastro, lê o código de texto da tela, guarda e confere.
+ * Devolve 'cadastro', 'codigo' ou null (a tela não pediu nada).
+ */
+async function passarDoSegundoFator(page, seletor = '.g-adm-abas, .g-vazio') {
+  const mfa = page.locator('[data-teste=mfa-cadastro], [data-teste=mfa-codigo-pedido]').first();
+  await Promise.race([mfa.waitFor({ timeout: 30000 }), page.waitForSelector(seletor, { timeout: 30000 })]).catch(() => {});
+  if (!(await mfa.isVisible().catch(() => false))) return null;
+  const uid = await page.locator('[data-teste=mfa]').getAttribute('data-usuario');
+  const cadastro = (await mfa.getAttribute('data-teste')) === 'mfa-cadastro';
+  if (cadastro) B.segredosMfa.set(uid, (await page.locator('[data-teste=mfa-segredo]').innerText()).trim());
+  const segredo = B.segredosMfa.get(uid);
+  if (!segredo) throw new Error('o painel pede o código do segundo fator e este teste não conhece o segredo (B.adminForte antes)');
+  await page.fill('[data-teste=mfa-codigo]', B.totp(segredo));
+  await page.locator('[data-teste=mfa] button[type=submit]').click();
+  await page.waitForSelector(seletor, { timeout: 30000 });
+  return cadastro ? 'cadastro' : 'codigo';
+}
+
+/** Abre uma rota e espera a tela assentar (rede quieta, com teto). No painel do administrador, passa do segundo fator. */
 async function ir(page, rota, seletor = '.g-main') {
   await page.goto(B.BASE_URL + rota);
+  if (/^\/gestao\/admin/.test(rota)) await passarDoSegundoFator(page, seletor || '.g-adm-abas, .g-vazio');
   if (seletor) await page.waitForSelector(seletor, { timeout: 30000 });
   await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
   await page.waitForTimeout(400);
@@ -70,4 +91,4 @@ async function doAlto(page, nome, papel = 'button') {
 }
 const rolagemLateral = (page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 
-module.exports = { playwright, abrirNavegador, fecharNavegador, contexto, entrar, fecharAvisos, ir, doAlto, rolagemLateral, IGNORAR };
+module.exports = { passarDoSegundoFator, playwright, abrirNavegador, fecharNavegador, contexto, entrar, fecharAvisos, ir, doAlto, rolagemLateral, IGNORAR };

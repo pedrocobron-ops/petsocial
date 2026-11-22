@@ -84,6 +84,8 @@ const txt = async (l) => (await l.innerText()).replace(/ /g, ' ');
   const c = B.must(await L.sb.dono.from('clientes').insert({ petshop_id: L.P, nome: 'Tutor Teste 1', telefone: '11966660000' }).select('id').single(), 'tutor').id;
   const mel = B.must(await L.sb.dono.from('pets').insert({ petshop_id: L.P, cliente_id: c, nome: 'Mel', especie: 'cao', porte: 'P', sexo: 'F' }).select('id').single(), 'pet').id;
   const ag = B.must(await L.sb.dono.from('agendamentos').insert({ petshop_id: L.P, pet_id: mel, servico_id: L.S.Banho, inicio: `${L.hoje}T08:00:00-03:00`, fim: `${L.hoje}T09:00:00-03:00` }).select('id').single(), 'horário').id;
+  // a foto existe de verdade no bucket (privado desde 20261245: o álbum mostra a foto pelo endereço assinado)
+  B.must(await L.sb.dono.storage.from('pets').upload(`${L.P}/teste-antes.jpg`, Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=', 'base64'), { contentType: 'image/jpeg' }), 'foto de antes');
   B.sql(`insert into agendamento_servicos (petshop_id, agendamento_id, servico_id, ordem, preco) values ('${L.P}', '${ag}', '${L.S['Corte de unhas']}', 1, 15); update agendamentos set preco = 50, foto_antes = '${L.P}/teste-antes.jpg' where id = '${ag}'`);
   await N.ir(page, `/gestao/app/clientes?pet=${mel}`);
   const album = page.locator('.g-bol-album');

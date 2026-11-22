@@ -185,6 +185,10 @@ function pdf(n) {
   T.depois(() => B.sql(geralAntes === '' ? `delete from config_interna where chave = 'caderno_dia_geral'` : `update config_interna set valor = ${B.q(geralAntes)} where chave = 'caderno_dia_geral'`));
   const todas = B.num(`select coalesce(sum(paginas), 0) from caderno_uso where dia = (now() at time zone 'America/Sao_Paulo')::date`);
   B.sql(`insert into config_interna (chave, valor) values ('caderno_dia_geral', '${todas + 1}') on conflict (chave) do update set valor = excluded.valor`);
+  // o teto próprio dos pet shops em teste (20261245, um quarto do geral) fica fora desta conta
+  const testeAntes = B.sql(`select coalesce((select valor from config_interna where chave = 'caderno_dia_geral_teste'), '')`);
+  T.depois(() => B.sql(testeAntes === '' ? `delete from config_interna where chave = 'caderno_dia_geral_teste'` : `update config_interna set valor = ${B.q(testeAntes)} where chave = 'caderno_dia_geral_teste'`));
+  B.sql(`insert into config_interna (chave, valor) values ('caderno_dia_geral_teste', '999999') on conflict (chave) do update set valor = excluded.valor`);
   r = await ler(Bl.sb.dono, 'clientes', foto(2), { petshop: Bl.P });
   T.ok('limite geral do dia: outro pet shop ouve "muitos pedidos hoje"', r.status === 429 && r.j?.erro === 'ocupado', r);
   r = await ler(Bl.sb.dono, 'clientes', foto(1), { petshop: Bl.P });

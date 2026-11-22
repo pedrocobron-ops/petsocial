@@ -100,7 +100,7 @@ function Formulario({ emailInicial, codigo }: { emailInicial: string; codigo: st
       const r = await aceitarConvite(banco(), codigo);
       setIndo(false);
       if ("erro" in r) { setErroConvite(r.erro); return; }
-      router.replace("/gestao/app");
+      window.location.replace("/gestao/app");
       return;
     }
     setIndo(false);

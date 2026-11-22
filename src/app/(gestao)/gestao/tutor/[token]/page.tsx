@@ -5,7 +5,6 @@ import { origemDoPedido, previaDaLoja } from "@/lib/gestao/link-og";
 import { BedDouble, CalendarDays, Check, MessageCircle, PawPrint, ShieldAlert, Sun, Syringe } from "lucide-react";
 import LogoLoja from "@/components/gestao/logo-loja";
 import { corPropria, TEMAS } from "@/lib/gestao/identidade";
-import { fotoPet } from "@/lib/gestao/supabase";
 import { bancoDoTutor, codigoValido } from "@/lib/gestao/tutor-servidor";
 import { linkWhatsApp } from "@/lib/gestao/util";
 import "../../agendar/[codigo]/agendar.css";
@@ -124,7 +123,7 @@ export default async function PaginaDoTutor({ params }: { params: Promise<{ toke
               <div className="g-tt-pet-t">
                 <span className="g-tt-avatar">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {fotoPet(pet.foto) ? <img src={fotoPet(pet.foto)!} alt="" /> : <PawPrint aria-hidden />}
+                  {pet.foto ? <img src={`/gestao/tutor/${token}/pet/${pet.id}`} alt="" /> : <PawPrint aria-hidden />}
                 </span>
                 <div>
                   <h2>{pet.nome}</h2>

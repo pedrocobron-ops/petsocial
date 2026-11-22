@@ -60,7 +60,7 @@ export default function Comecar() {
       if (!data.session) { router.replace("/gestao/entrar"); return; }
       // quem foi convidado para uma equipe, ou já tem pet shop, vai direto para o aplicativo
       const { data: vinculos } = await sb.rpc("entrar");
-      if (vinculos?.length) { router.replace("/gestao/app"); return; }
+      if (vinculos?.length) { window.location.replace("/gestao/app"); return; }
       const u = data.session.user;
       setSeuNome(String(u.user_metadata?.nome ?? ""));
       setUserId(u.id);
@@ -129,14 +129,14 @@ export default function Comecar() {
     guardarLembrado(chaveBoasVindas(id), "cor");
     guardarLembrado("maestro-gestao-petshop", id);
     try { localStorage.removeItem(rascunhoDe(userId)); localStorage.removeItem(RASCUNHO); sessionStorage.removeItem(RASCUNHO); } catch { /* tudo bem */ }
-    router.replace("/gestao/app");
+    window.location.replace("/gestao/app");
   }
 
   async function conferirDeNovo() {
     setConferindo(true);
     const { data: vinculos } = await banco().rpc("entrar");
     setConferindo(false);
-    if (vinculos?.length) router.replace("/gestao/app");
+    if (vinculos?.length) window.location.replace("/gestao/app");
     else setErro("Ainda não achei nenhum pet shop ligado a esta conta.");
   }
   async function sair() {

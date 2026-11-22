@@ -159,10 +159,14 @@ export default function Casca({ children }: { children: React.ReactNode }) {
     try { guardado = sessionStorage.getItem(chave); } catch { /* sem armazenamento: pergunta */ }
     if (guardado === "0" || guardado === "1") { setAdmin(guardado === "1"); return; }
     let vale = true;
-    const parar = quandoATelaAbrir(() => void sb.rpc("sou_admin").then((r) => {
+    // admin_situacao: é da equipe, mesmo antes do código do segundo fator (sou_admin só diz sim depois dele).
+    // Banco sem a função (antes da migração 20261245): pergunta como antes.
+    const parar = quandoATelaAbrir(() => void sb.rpc("admin_situacao").then(async (r) => {
+      let sim = (r.data as { admin?: boolean } | null)?.admin === true, erro = r.error;
+      if (erro && (erro.code === "PGRST202" || erro.code === "42883")) { const v = await sb.rpc("sou_admin"); sim = v.data === true; erro = v.error; }
       if (!vale) return;
-      setAdmin(r.data === true);
-      if (!r.error) { try { sessionStorage.setItem(chave, r.data === true ? "1" : "0"); } catch { /* segue */ } }
+      setAdmin(sim);
+      if (!erro) { try { sessionStorage.setItem(chave, sim ? "1" : "0"); } catch { /* segue */ } }
     }));
     return () => { vale = false; parar(); };
   }, [sb, eu.user_id]);

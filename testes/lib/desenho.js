@@ -80,7 +80,8 @@ function caminhoDoAxe() {
 /** Roda o axe-core (WCAG 2.0/2.1/2.2 A e AA + boas práticas) e devolve as regras quebradas com a contagem. */
 async function axe(page, arquivo = caminhoDoAxe()) {
   if (!arquivo) return null;
-  await page.addScriptTag({ path: arquivo });
+  // o aplicativo tem a regra de conteúdo que vale (20261245): um <script> posto na página seria barrado; roda pelo Playwright
+  await page.evaluate(`${require('fs').readFileSync(arquivo, 'utf8')}\n;void 0`);
   return page.evaluate(async () => {
     const r = await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'] } });
     return r.violations.map((v) => ({ id: v.id, impacto: v.impact, n: v.nodes.length, onde: v.nodes.slice(0, 3).map((n) => n.target.join(' ').slice(0, 90)) }));

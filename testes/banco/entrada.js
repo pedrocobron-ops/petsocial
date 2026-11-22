@@ -105,10 +105,11 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   T.ok('foto que não existe: 404', (await fetch(`${B.BASE_URL}/gestao/entrada/${tk}/foto/1`)).status === 404);
   const aceitar = (corpo, t = tk) => fetch(`${B.BASE_URL}/gestao/entrada/${t}/aceite`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': 'teste-entrada/1.0', 'X-Forwarded-For': '203.0.113.9' }, body: JSON.stringify(corpo) });
   T.ok('sem nome: 400', (await aceitar({ nome: '' })).status === 400);
-  const [x1, x2] = await Promise.all([aceitar({ nome: 'Ana Souza' }), aceitar({ nome: 'Ana Souza' })]);
+  // o IP e o navegador que o servidor repassa só valem com a trava do servidor (20261245), como em produção
+  const [x1, x2] = await B.comTravaDoServidor(() => Promise.all([aceitar({ nome: 'Ana Souza' }), aceitar({ nome: 'Ana Souza' })]));
   const j1 = await x1.json(), j2 = await x2.json();
   T.ok('"Li e concordo" duas vezes ao mesmo tempo: o mesmo aceite', x1.status === 200 && x2.status === 200 && j1.aceito_em === j2.aceito_em, [j1, j2]);
-  T.ok('aceite pelo link com IP e navegador', B.sql(`select aceite || '|' || aceite_nome || '|' || coalesce(aceite_ip, '-') || '|' || coalesce(aceite_navegador, '-') from entradas where id='${id}'`).startsWith('link|Ana Souza|') && B.sql(`select aceite_navegador from entradas where id='${id}'`) === 'teste-entrada/1.0');
+  T.ok('aceite pelo link com IP e navegador', B.sql(`select aceite || '|' || aceite_nome || '|' || coalesce(aceite_ip, '-') || '|' || coalesce(aceite_navegador, '-') from entradas where id='${id}'`).startsWith('link|Ana Souza|') && B.sql(`select aceite_navegador || '|' || aceite_ip from entradas where id='${id}'`) === 'teste-entrada/1.0|203.0.113.9');
   T.ok('a página mostra o aceite', (await anon.rpc('entrada_publica', { p_token: tk })).data?.aceito_em === j1.aceito_em);
   B.sql(`update entradas set token_expira = now() - interval '1 minute' where id='${id}'`);
   T.ok('vencido: página 404, foto 404 e aceite recusado', (await fetch(`${B.BASE_URL}/gestao/entrada/${tk}`)).status === 404

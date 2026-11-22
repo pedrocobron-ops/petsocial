@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Camera, MessageCircle, Send, Trash2 } from "lucide-react";
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
 import { reduzirFoto } from "@/lib/gestao/foto";
-import { fotoPet } from "@/lib/gestao/supabase";
+import { linkDaFotoPet, urlDaFotoPet, useFotoPet } from "@/lib/gestao/fotos-pets";
 import { linkWhatsApp, chamar } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { avisarMudanca, ok, useAvisos, useSomenteLeitura } from "../ui";
@@ -17,7 +17,7 @@ const LIMITE = 1_000_000; // o bucket `pets` aceita até 1 MB por arquivo
 /**
  * Fotos de antes e depois do atendimento: dois quadros lado a lado, guardados no bucket `pets` (pasta do pet shop).
  * "Mandar para o tutor" abre o compartilhamento do celular com as fotos ou, sem isso, o WhatsApp do tutor com o
- * endereço da foto. Quem envia é a pessoa: o sistema não manda nada sozinho.
+ * endereço da foto (assinado, vale 7 dias: o bucket é privado). Quem envia é a pessoa: o sistema não manda nada sozinho.
  */
 export default function AntesDepois({ agendamento: a, aoMudar }: { agendamento: AgendamentoCompleto; aoMudar: () => void }) {
   const { sb, petshop } = useGestao();
@@ -41,9 +41,9 @@ export default function AntesDepois({ agendamento: a, aoMudar }: { agendamento: 
     if (!toque) return;
     let vivo = true;
     for (const { id } of LADOS) {
-      const caminho = fotos[id], url = fotoPet(caminho);
-      if (!caminho || !url || arquivos[caminho]) continue;
-      void fetch(url).then((r) => (r.ok ? r.blob() : Promise.reject(new Error("sem foto")))).then((blob) => {
+      const caminho = fotos[id];
+      if (!caminho || arquivos[caminho]) continue;
+      void urlDaFotoPet(caminho).then((url) => (url ? fetch(url) : Promise.reject(new Error("sem foto")))).then((r) => (r.ok ? r.blob() : Promise.reject(new Error("sem foto")))).then((blob) => {
         if (vivo) setArquivos((x) => ({ ...x, [caminho]: new File([blob], nomeDoArquivo(id), { type: "image/jpeg" }) }));
       }).catch(() => { /* sem o arquivo, vale o WhatsApp com o endereço da foto */ });
     }
@@ -102,7 +102,16 @@ export default function AntesDepois({ agendamento: a, aoMudar }: { agendamento: 
   const prontos = caminhos.map((c) => arquivos[c]).filter(Boolean);
   const texto = fotos.depois ? `Olha como ${nomePet} ficou!` : `Olha ${nomePet} aqui com a gente!`;
   const compartilha = toque && caminhos.length > 0 && prontos.length === caminhos.length && navigator.canShare({ files: prontos });
-  const zap = linkWhatsApp(tutor?.telefone, `${tutor?.nome ? `Oi, ${chamar(tutor.nome)}! ` : ""}${texto} ${fotoPet(fotos.depois ?? fotos.antes) ?? ""}`.trim());
+  // o endereço que vai no WhatsApp vale 7 dias (o da tela, 1 hora)
+  const [linkFoto, setLinkFoto] = useState<string | null>(null);
+  const paraMandar = fotos.depois ?? fotos.antes;
+  useEffect(() => {
+    let vivo = true;
+    setLinkFoto(null);
+    if (paraMandar) void linkDaFotoPet(paraMandar).then((u) => { if (vivo) setLinkFoto(u); });
+    return () => { vivo = false; };
+  }, [paraMandar]);
+  const zap = linkWhatsApp(tutor?.telefone, `${tutor?.nome ? `Oi, ${chamar(tutor.nome)}! ` : ""}${texto} ${linkFoto ?? ""}`.trim());
 
   async function compartilhar() {
     try { await navigator.share({ files: prontos, text: texto }); }
@@ -113,16 +122,13 @@ export default function AntesDepois({ agendamento: a, aoMudar }: { agendamento: 
     <div className="g-campo g-agd-fotos"><span>Antes e depois</span>
       <div className="g-agd-quadros">
         {LADOS.map(({ id, rotulo }) => {
-          const url = fotoPet(fotos[id]);
+          const tem = Boolean(fotos[id]);
           return (
-            <div key={id} className={`g-agd-quadro${url ? " cheio" : ""}`}>
+            <div key={id} className={`g-agd-quadro${tem ? " cheio" : ""}`}>
               <button type="button" className="g-agd-quadro-toque" disabled={ocupado !== null}
-                aria-label={url ? `Trocar a foto de ${id}` : `Tirar a foto de ${id}`}
+                aria-label={tem ? `Trocar a foto de ${id}` : `Tirar a foto de ${id}`}
                 onClick={() => { if (!somenteLeitura()) entradas.current[id]?.click(); }}>
-                {url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={url} alt={`${nomePet}, ${id}`} loading="lazy" />
-                ) : (
+                {tem ? <FotoDoQuadro caminho={fotos[id]} alt={`${nomePet}, ${id}`} /> : (
                   <>
                     <span className="g-agd-quadro-ico"><Camera aria-hidden /></span>
                     <b>{rotulo}</b>
@@ -130,8 +136,8 @@ export default function AntesDepois({ agendamento: a, aoMudar }: { agendamento: 
                   </>
                 )}
               </button>
-              {url && <span className="g-agd-quadro-rot">{rotulo}</span>}
-              {url && ocupado !== id && <button type="button" className="g-agd-quadro-x" disabled={ocupado !== null} aria-label={`Remover a foto de ${id}`} onClick={() => void remover(id)}><Trash2 aria-hidden /></button>}
+              {tem && <span className="g-agd-quadro-rot">{rotulo}</span>}
+              {tem && ocupado !== id && <button type="button" className="g-agd-quadro-x" disabled={ocupado !== null} aria-label={`Remover a foto de ${id}`} onClick={() => void remover(id)}><Trash2 aria-hidden /></button>}
               {ocupado === id && <span className="g-agd-quadro-env" role="status">Um instante…</span>}
               <input ref={(el) => { entradas.current[id] = el; }} type="file" accept="image/*" hidden onChange={(e) => void escolher(id, e)} />
             </div>
@@ -148,4 +154,11 @@ export default function AntesDepois({ agendamento: a, aoMudar }: { agendamento: 
       )}
     </div>
   );
+}
+
+/** A foto de um quadro (endereço assinado; enquanto chega, o quadro fica vazio). */
+function FotoDoQuadro({ caminho, alt }: { caminho: string | null; alt: string }) {
+  const url = useFotoPet(caminho);
+  // eslint-disable-next-line @next/next/no-img-element
+  return url ? <img src={url} alt={alt} loading="lazy" /> : <span className="g-agd-quadro-env" role="status">Um instante…</span>;
 }

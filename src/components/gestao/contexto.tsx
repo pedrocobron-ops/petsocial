@@ -107,7 +107,7 @@ let soConsulta = false;
 /** A conta está só para consulta (teste vencido ou assinatura cancelada)? Para as mensagens de erro, fora dos componentes. */
 export const contaSoConsulta = () => soConsulta;
 
-export function GestaoProvider({ children }: { children: React.ReactNode }) {
+export function GestaoProvider({ children, nonce }: { children: React.ReactNode; nonce?: string }) {
   const router = useRouter();
   const sb = banco();
   const [user, setUser] = useState<User | null>(null);
@@ -301,13 +301,13 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
       <div className="g g-raiz"><div className="g-vazio" style={{ minHeight: "100dvh", alignContent: "center" }}>
         <Selo tamanho={72} tom="suave" />
         <p id="g-abrindo" suppressHydrationWarning>Abrindo o seu pet shop…</p>
-        <script dangerouslySetInnerHTML={{ __html: SCRIPT_DO_NOME }} />
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: SCRIPT_DO_NOME }} />
         {/* abertura que demora: diz o que está acontecendo e dá uma saída (nunca fica só "Abrindo…" sem botão) */}
         <div id="g-abrindo-demora" className="g-pilha p" style={{ justifyItems: "center", maxWidth: 420, display: demorou ? undefined : "none" }} suppressHydrationWarning role="status">
           <p className="g-muted" suppressHydrationWarning>{ETAPAS[etapa]} Nada do que você salvou se perdeu.</p>
           <button type="button" className="g-btn verde" onClick={tentarDeNovo}>Tentar de novo</button>
         </div>
-        <script dangerouslySetInnerHTML={{ __html: SCRIPT_DA_DEMORA }} />
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: SCRIPT_DA_DEMORA }} />
       </div></div>
     );
   }

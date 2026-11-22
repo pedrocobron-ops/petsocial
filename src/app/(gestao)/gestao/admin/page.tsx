@@ -14,6 +14,7 @@ import AbaErros from "@/components/gestao/admin/erros";
 import AbaAceites from "@/components/gestao/admin/aceites";
 import AbaVendas from "@/components/gestao/admin/vendas";
 import AbaDados, { LembreteDaCopia, LembreteDasRotinas } from "@/components/gestao/admin/dados";
+import SegundoFator from "@/components/gestao/admin/segundo-fator";
 import { AvisosProvider, Campo, Esqueleto, Folha, Vazio, mensagemDeErro, ok, useAvisos } from "@/components/gestao/ui";
 import { banco, configurado } from "@/lib/gestao/supabase";
 import { dataCompleta, fmtTelefone, haQuanto, hora, isoDia, semAcento } from "@/lib/gestao/util";
@@ -96,7 +97,8 @@ export default function Pagina() {
 function Admin() {
   const router = useRouter();
   const { avisarErro } = useAvisos();
-  const [acesso, setAcesso] = useState<"vendo" | "sim" | "nao">("vendo");
+  const [acesso, setAcesso] = useState<"vendo" | "fator" | "sim" | "nao">("vendo");
+  const [usuario, setUsuario] = useState("");
   const [lojas, setLojas] = useState<Loja[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
@@ -131,10 +133,22 @@ function Admin() {
       const { data } = await banco().auth.getSession();
       if (!vivo) return;
       if (!data.session) { router.replace("/gestao/entrar"); return; }
-      const r = await banco().rpc("sou_admin");
+      setUsuario(data.session.user.id);
+      // é da equipe? a sessão já passou pelo segundo fator? (os dados do painel só saem com ele: sou_admin, migração 20261245)
+      const r = await banco().rpc("admin_situacao");
       if (!vivo) return;
+      if (r.error && (r.error.code === "PGRST202" || r.error.code === "42883")) {
+        // banco sem a função nova: como antes
+        const v = await banco().rpc("sou_admin");
+        if (!vivo) return;
+        if (v.error) { setErro(mensagemDeErro(v.error)); setAcesso("nao"); return; }
+        if (!v.data) { setAcesso("nao"); return; }
+        setAcesso("sim"); void carregar(); return;
+      }
       if (r.error) { setErro(mensagemDeErro(r.error)); setAcesso("nao"); return; }
-      if (!r.data) { setAcesso("nao"); return; }
+      const s = r.data as { admin?: boolean; forte?: boolean } | null;
+      if (!s?.admin) { setAcesso("nao"); return; }
+      if (!s.forte) { setAcesso("fator"); return; }
       setAcesso("sim");
       void carregar();
     })();
@@ -178,6 +192,7 @@ function Admin() {
   }
 
   if (acesso === "vendo") return <main className="g-main"><Esqueleto linhas={5} /></main>;
+  if (acesso === "fator") return <SegundoFator usuario={usuario} aoPassar={() => { setAcesso("sim"); void carregar(); }} aoSair={() => void sair()} />;
   if (acesso === "nao") {
     return (
       <main className="g-main">

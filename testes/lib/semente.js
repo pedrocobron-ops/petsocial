@@ -57,6 +57,10 @@ async function criarLoja(T, o = {}) {
   if (T && !process.env.MANTER_DADOS) T.depois(() => limpar(L));
   L.limpar = () => limpar(L);
   L.ids.dono = B.sql(`select id from profissionais where petshop_id='${L.P}' and papel='dono'`);
+  // o Supabase local confirma o e-mail sozinho no cadastro (no mesmo instante da criação), o que para a IA do teste grátis não
+  // conta como e-mail confirmado (ia_dono_confirmado, migração 20261245): aqui fica como quem abriu o link de confirmação.
+  // Não mexe em emails_confirmados (a prova pelo código, que outros testes conferem). `o.emailSemConfirmar`: fica como veio.
+  if (!o.emailSemConfirmar) B.sql(`update auth.users set email_confirmed_at = created_at + interval '1 minute' where email = ${B.q(L.emails.dono)}`);
   B.must(await L.sb.dono.from('petshops').update({ guia_feito_em: new Date().toISOString(), diaria_creche: 70, diaria_hotel: 120, horario: HORARIO, link_ativo: true, link_hotel: true, link_creche: true, vagas_creche: 20, vagas_hotel: 20 }).eq('id', L.P).select('id'), 'ajustes do pet shop');
   const ps = B.sql(`select fuso || '|' || link_codigo from petshops where id='${L.P}'`).split('|');
   L.fuso = ps[0]; L.codigo = ps[1];
