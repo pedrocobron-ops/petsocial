@@ -2597,14 +2597,14 @@ isOneToOne: false
                   ]
                 },"pedidos_agendamento": {
                   Row: {
-                    "agendamento_id": string | null,"avisado_em": string | null,"cliente_cancelou_em": string | null,"cliente_pedido_visto_em": string | null,"cliente_pediu": string | null,"cliente_pediu_em": string | null,"cliente_recado": string | null,"criado_em": string,"especie": string,"estadia_id": string | null,"experiencia": boolean,"fim": string,"grupo_id": string | null,"id": string,"inicio": string,"obs": string | null,"outros_servicos": (string)[] | null,"pet_nome": string,"petshop_id": string,"porte": string | null,"promo": Json | null,"servico_id": string | null,"status": string,"telefone": string,"termos_aceitos_em": string | null,"termos_texto": string | null,"termos_vacinas": boolean | null,"tipo": string,"tutor_nome": string
+                    "agendamento_id": string | null,"avisado_em": string | null,"cliente_cancelou_em": string | null,"cliente_pedido_visto_em": string | null,"cliente_pediu": string | null,"cliente_pediu_em": string | null,"cliente_recado": string | null,"criado_em": string,"especie": string,"estadia_id": string | null,"experiencia": boolean,"fim": string,"grupo_id": string | null,"id": string,"inicio": string,"obs": string | null,"outros_servicos": (string)[] | null,"pet_nome": string,"pet_novo": boolean,"petshop_id": string,"porte": string | null,"promo": Json | null,"servico_id": string | null,"status": string,"telefone": string,"termos_aceitos_em": string | null,"termos_texto": string | null,"termos_vacinas": boolean | null,"tipo": string,"tutor_nome": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "agendamento_id"?: string | null,"avisado_em"?: string | null,"cliente_cancelou_em"?: string | null,"cliente_pedido_visto_em"?: string | null,"cliente_pediu"?: string | null,"cliente_pediu_em"?: string | null,"cliente_recado"?: string | null,"criado_em"?: string,"especie"?: string,"estadia_id"?: string | null,"experiencia"?: boolean,"fim": string,"grupo_id"?: string | null,"id"?: string,"inicio": string,"obs"?: string | null,"outros_servicos"?: (string)[] | null,"pet_nome": string,"petshop_id": string,"porte"?: string | null,"promo"?: Json | null,"servico_id"?: string | null,"status"?: string,"telefone": string,"termos_aceitos_em"?: string | null,"termos_texto"?: string | null,"termos_vacinas"?: boolean | null,"tipo"?: string,"tutor_nome": string
+                    "agendamento_id"?: string | null,"avisado_em"?: string | null,"cliente_cancelou_em"?: string | null,"cliente_pedido_visto_em"?: string | null,"cliente_pediu"?: string | null,"cliente_pediu_em"?: string | null,"cliente_recado"?: string | null,"criado_em"?: string,"especie"?: string,"estadia_id"?: string | null,"experiencia"?: boolean,"fim": string,"grupo_id"?: string | null,"id"?: string,"inicio": string,"obs"?: string | null,"outros_servicos"?: (string)[] | null,"pet_nome": string,"pet_novo"?: boolean,"petshop_id": string,"porte"?: string | null,"promo"?: Json | null,"servico_id"?: string | null,"status"?: string,"telefone": string,"termos_aceitos_em"?: string | null,"termos_texto"?: string | null,"termos_vacinas"?: boolean | null,"tipo"?: string,"tutor_nome": string
                   }
                   Update: {
-                    "agendamento_id"?: string | null,"avisado_em"?: string | null,"cliente_cancelou_em"?: string | null,"cliente_pedido_visto_em"?: string | null,"cliente_pediu"?: string | null,"cliente_pediu_em"?: string | null,"cliente_recado"?: string | null,"criado_em"?: string,"especie"?: string,"estadia_id"?: string | null,"experiencia"?: boolean,"fim"?: string,"grupo_id"?: string | null,"id"?: string,"inicio"?: string,"obs"?: string | null,"outros_servicos"?: (string)[] | null,"pet_nome"?: string,"petshop_id"?: string,"porte"?: string | null,"promo"?: Json | null,"servico_id"?: string | null,"status"?: string,"telefone"?: string,"termos_aceitos_em"?: string | null,"termos_texto"?: string | null,"termos_vacinas"?: boolean | null,"tipo"?: string,"tutor_nome"?: string
+                    "agendamento_id"?: string | null,"avisado_em"?: string | null,"cliente_cancelou_em"?: string | null,"cliente_pedido_visto_em"?: string | null,"cliente_pediu"?: string | null,"cliente_pediu_em"?: string | null,"cliente_recado"?: string | null,"criado_em"?: string,"especie"?: string,"estadia_id"?: string | null,"experiencia"?: boolean,"fim"?: string,"grupo_id"?: string | null,"id"?: string,"inicio"?: string,"obs"?: string | null,"outros_servicos"?: (string)[] | null,"pet_nome"?: string,"pet_novo"?: boolean,"petshop_id"?: string,"porte"?: string | null,"promo"?: Json | null,"servico_id"?: string | null,"status"?: string,"telefone"?: string,"termos_aceitos_em"?: string | null,"termos_texto"?: string | null,"termos_vacinas"?: boolean | null,"tipo"?: string,"tutor_nome"?: string
                   }
                   Relationships: [
                     {
@@ -2747,14 +2747,14 @@ isOneToOne: false
                   ]
                 },"petshops": {
                   Row: {
-                    "assinatura_desde": string | null,"bairro": string | null,"cakto_assinatura": string | null,"cakto_email": string | null,"cidade": string | null,"complemento": string | null,"conta_teste": boolean,"creche_bloqueia_vacina": boolean,"criado_em": string,"criado_por": string | null,"diaria_creche": number | null,"diaria_hotel": number | null,"endereco": string | null,"fidelidade_cada": number | null,"fidelidade_desde": string | null,"fidelidade_premio": string | null,"fuso": string,"guia_feito_em": string | null,"horario": NonNullable<Json>,"id": string,"link_ativo": boolean,"link_aviso": string | null,"link_codigo": string,"link_creche": boolean,"link_hotel": boolean,"logo": string | null,"meta_mes": number | null,"modulos": (string)[] | null,"nome": string,"opcoes": NonNullable<Json>,"pago_ate": string | null,"periodo_meses": number,"plano": string,"principal": string | null,"status": Database["public"]['Enums']["status_assinatura"],"telefone": string | null,"tema": string,"teste_ate": string,"uf": string | null,"vagas": number | null,"vagas_creche": number | null,"vagas_hotel": number | null,"whatsapp": boolean
+                    "assinatura_desde": string | null,"bairro": string | null,"cakto_assinatura": string | null,"cakto_email": string | null,"cidade": string | null,"complemento": string | null,"conta_teste": boolean,"creche_bloqueia_vacina": boolean,"criado_em": string,"criado_por": string | null,"diaria_creche": number | null,"diaria_hotel": number | null,"endereco": string | null,"fidelidade_cada": number | null,"fidelidade_desde": string | null,"fidelidade_premio": string | null,"fuso": string,"guia_feito_em": string | null,"horario": NonNullable<Json>,"horario_creche": Json | null,"horario_hotel": Json | null,"id": string,"link_ativo": boolean,"link_aviso": string | null,"link_codigo": string,"link_creche": boolean,"link_hotel": boolean,"logo": string | null,"meta_mes": number | null,"modulos": (string)[] | null,"nome": string,"opcoes": NonNullable<Json>,"pago_ate": string | null,"periodo_meses": number,"plano": string,"principal": string | null,"status": Database["public"]['Enums']["status_assinatura"],"telefone": string | null,"tema": string,"teste_ate": string,"uf": string | null,"vagas": number | null,"vagas_creche": number | null,"vagas_hotel": number | null,"whatsapp": boolean
                   }
                   ComputedFields: never
                   Insert: {
-                    "assinatura_desde"?: string | null,"bairro"?: string | null,"cakto_assinatura"?: string | null,"cakto_email"?: string | null,"cidade"?: string | null,"complemento"?: string | null,"conta_teste"?: boolean,"creche_bloqueia_vacina"?: boolean,"criado_em"?: string,"criado_por"?: string | null,"diaria_creche"?: number | null,"diaria_hotel"?: number | null,"endereco"?: string | null,"fidelidade_cada"?: number | null,"fidelidade_desde"?: string | null,"fidelidade_premio"?: string | null,"fuso"?: string,"guia_feito_em"?: string | null,"horario"?: NonNullable<Json>,"id"?: string,"link_ativo"?: boolean,"link_aviso"?: string | null,"link_codigo"?: string,"link_creche"?: boolean,"link_hotel"?: boolean,"logo"?: string | null,"meta_mes"?: number | null,"modulos"?: (string)[] | null,"nome": string,"opcoes"?: NonNullable<Json>,"pago_ate"?: string | null,"periodo_meses"?: number,"plano"?: string,"principal"?: string | null,"status"?: Database["public"]['Enums']["status_assinatura"],"telefone"?: string | null,"tema"?: string,"teste_ate"?: string,"uf"?: string | null,"vagas"?: number | null,"vagas_creche"?: number | null,"vagas_hotel"?: number | null,"whatsapp"?: boolean
+                    "assinatura_desde"?: string | null,"bairro"?: string | null,"cakto_assinatura"?: string | null,"cakto_email"?: string | null,"cidade"?: string | null,"complemento"?: string | null,"conta_teste"?: boolean,"creche_bloqueia_vacina"?: boolean,"criado_em"?: string,"criado_por"?: string | null,"diaria_creche"?: number | null,"diaria_hotel"?: number | null,"endereco"?: string | null,"fidelidade_cada"?: number | null,"fidelidade_desde"?: string | null,"fidelidade_premio"?: string | null,"fuso"?: string,"guia_feito_em"?: string | null,"horario"?: NonNullable<Json>,"horario_creche"?: Json | null,"horario_hotel"?: Json | null,"id"?: string,"link_ativo"?: boolean,"link_aviso"?: string | null,"link_codigo"?: string,"link_creche"?: boolean,"link_hotel"?: boolean,"logo"?: string | null,"meta_mes"?: number | null,"modulos"?: (string)[] | null,"nome": string,"opcoes"?: NonNullable<Json>,"pago_ate"?: string | null,"periodo_meses"?: number,"plano"?: string,"principal"?: string | null,"status"?: Database["public"]['Enums']["status_assinatura"],"telefone"?: string | null,"tema"?: string,"teste_ate"?: string,"uf"?: string | null,"vagas"?: number | null,"vagas_creche"?: number | null,"vagas_hotel"?: number | null,"whatsapp"?: boolean
                   }
                   Update: {
-                    "assinatura_desde"?: string | null,"bairro"?: string | null,"cakto_assinatura"?: string | null,"cakto_email"?: string | null,"cidade"?: string | null,"complemento"?: string | null,"conta_teste"?: boolean,"creche_bloqueia_vacina"?: boolean,"criado_em"?: string,"criado_por"?: string | null,"diaria_creche"?: number | null,"diaria_hotel"?: number | null,"endereco"?: string | null,"fidelidade_cada"?: number | null,"fidelidade_desde"?: string | null,"fidelidade_premio"?: string | null,"fuso"?: string,"guia_feito_em"?: string | null,"horario"?: NonNullable<Json>,"id"?: string,"link_ativo"?: boolean,"link_aviso"?: string | null,"link_codigo"?: string,"link_creche"?: boolean,"link_hotel"?: boolean,"logo"?: string | null,"meta_mes"?: number | null,"modulos"?: (string)[] | null,"nome"?: string,"opcoes"?: NonNullable<Json>,"pago_ate"?: string | null,"periodo_meses"?: number,"plano"?: string,"principal"?: string | null,"status"?: Database["public"]['Enums']["status_assinatura"],"telefone"?: string | null,"tema"?: string,"teste_ate"?: string,"uf"?: string | null,"vagas"?: number | null,"vagas_creche"?: number | null,"vagas_hotel"?: number | null,"whatsapp"?: boolean
+                    "assinatura_desde"?: string | null,"bairro"?: string | null,"cakto_assinatura"?: string | null,"cakto_email"?: string | null,"cidade"?: string | null,"complemento"?: string | null,"conta_teste"?: boolean,"creche_bloqueia_vacina"?: boolean,"criado_em"?: string,"criado_por"?: string | null,"diaria_creche"?: number | null,"diaria_hotel"?: number | null,"endereco"?: string | null,"fidelidade_cada"?: number | null,"fidelidade_desde"?: string | null,"fidelidade_premio"?: string | null,"fuso"?: string,"guia_feito_em"?: string | null,"horario"?: NonNullable<Json>,"horario_creche"?: Json | null,"horario_hotel"?: Json | null,"id"?: string,"link_ativo"?: boolean,"link_aviso"?: string | null,"link_codigo"?: string,"link_creche"?: boolean,"link_hotel"?: boolean,"logo"?: string | null,"meta_mes"?: number | null,"modulos"?: (string)[] | null,"nome"?: string,"opcoes"?: NonNullable<Json>,"pago_ate"?: string | null,"periodo_meses"?: number,"plano"?: string,"principal"?: string | null,"status"?: Database["public"]['Enums']["status_assinatura"],"telefone"?: string | null,"tema"?: string,"teste_ate"?: string,"uf"?: string | null,"vagas"?: number | null,"vagas_creche"?: number | null,"vagas_hotel"?: number | null,"whatsapp"?: boolean
                   }
                   Relationships: [
                     
@@ -3095,14 +3095,14 @@ isOneToOne: false
                   ]
                 },"servicos": {
                   Row: {
-                    "ativo": boolean,"categoria": string,"cor": string,"criado_em": string,"custo_material": number | null,"duracao_min": number,"id": string,"nome": string,"ordem": number,"petshop_id": string,"preco_g": number | null,"preco_gg": number | null,"preco_m": number | null,"preco_p": number | null
+                    "ativo": boolean,"categoria": string,"cor": string,"criado_em": string,"custo_material": number | null,"duracao_min": number,"horario": Json | null,"id": string,"nome": string,"ordem": number,"petshop_id": string,"preco_g": number | null,"preco_gg": number | null,"preco_m": number | null,"preco_p": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "ativo"?: boolean,"categoria"?: string,"cor"?: string,"criado_em"?: string,"custo_material"?: number | null,"duracao_min"?: number,"id"?: string,"nome": string,"ordem"?: number,"petshop_id": string,"preco_g"?: number | null,"preco_gg"?: number | null,"preco_m"?: number | null,"preco_p"?: number | null
+                    "ativo"?: boolean,"categoria"?: string,"cor"?: string,"criado_em"?: string,"custo_material"?: number | null,"duracao_min"?: number,"horario"?: Json | null,"id"?: string,"nome": string,"ordem"?: number,"petshop_id": string,"preco_g"?: number | null,"preco_gg"?: number | null,"preco_m"?: number | null,"preco_p"?: number | null
                   }
                   Update: {
-                    "ativo"?: boolean,"categoria"?: string,"cor"?: string,"criado_em"?: string,"custo_material"?: number | null,"duracao_min"?: number,"id"?: string,"nome"?: string,"ordem"?: number,"petshop_id"?: string,"preco_g"?: number | null,"preco_gg"?: number | null,"preco_m"?: number | null,"preco_p"?: number | null
+                    "ativo"?: boolean,"categoria"?: string,"cor"?: string,"criado_em"?: string,"custo_material"?: number | null,"duracao_min"?: number,"horario"?: Json | null,"id"?: string,"nome"?: string,"ordem"?: number,"petshop_id"?: string,"preco_g"?: number | null,"preco_gg"?: number | null,"preco_m"?: number | null,"preco_p"?: number | null
                   }
                   Relationships: [
                     {
@@ -4256,6 +4256,9 @@ isOneToOne: false
 "hoje_do_petshop":
 { Args: { "p": string }; Returns: string
                            },
+"horario_valido":
+{ Args: { "p": Json }; Returns: boolean
+                           },
 "hotel_busca_ate":
 { Args: { "p_petshop": string }; Returns: string
                            },
@@ -4374,6 +4377,9 @@ isOneToOne: false
                            },
 "link_estadia_cheios":
 { Args: { "p_ate": string,"p_codigo": string,"p_de": string,"p_tipo": string }; Returns: string[]
+                           },
+"link_estadia_dia_recusado":
+{ Args: { "p_dia": string,"p_hora": string,"p_petshop": string,"p_quando": string,"p_tipo": string }; Returns: Json
                            },
 "link_extras":
 { Args: { "p_extras": Json,"p_petshop": string,"p_principal": string }; Returns: (string)[]
@@ -4597,6 +4603,9 @@ isOneToOne: false
 "niver_perto":
 { Args: { "p_dia": string,"p_janela"?: number,"p_nascimento": string }; Returns: boolean
                            },
+"nome_de_pet":
+{ Args: { "p": string }; Returns: string
+                           },
 "nome_na_equipe":
 { Args: { "p": string }; Returns: string
                            },
@@ -4646,15 +4655,22 @@ isOneToOne: false
                            },
 "pedido_aceitar":
 { Args: { "p_forcar"?: boolean,"p_id": string,"p_profissional"?: string }; Returns: string
+                           } |
+{ Args: { "p_forcar": boolean,"p_id": string,"p_pet": string,"p_profissional": string }; Returns: string
                            },
 "pedido_aceitar_como":
 { Args: { "p_forcar"?: boolean,"p_id": string,"p_profissional"?: string,"p_tutor_novo"?: boolean }; Returns: string
+                           } |
+{ Args: { "p_forcar": boolean,"p_id": string,"p_pet": string,"p_profissional": string,"p_tutor_novo": boolean }; Returns: string
                            },
 "pedido_acertar_diaria":
 { Args: { "p_id": string }; Returns: undefined
                            },
 "pedido_criar_sinal":
 { Args: { "p_id": string }; Returns: Json
+                           },
+"pedido_trocar_pet":
+{ Args: { "p_id": string,"p_pet": string }; Returns: Json
                            },
 "pedido_tutores_do_telefone":
 { Args: { "p_id": string }; Returns: {
@@ -4663,6 +4679,8 @@ isOneToOne: false
                            },
 "pedidos_aceitar_juntos":
 { Args: { "p_forcar"?: boolean,"p_ids": (string)[],"p_portes"?: Json,"p_profissional"?: string,"p_tutor_novo"?: boolean }; Returns: Json
+                           } |
+{ Args: { "p_forcar": boolean,"p_ids": (string)[],"p_pets": Json,"p_portes": Json,"p_profissional": string,"p_tutor_novo": boolean }; Returns: Json
                            },
 "pedidos_estadia_visto":
 { Args: { "p_args": Json,"p_id": string }; Returns: undefined

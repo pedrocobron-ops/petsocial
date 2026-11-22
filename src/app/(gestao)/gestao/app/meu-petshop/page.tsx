@@ -38,6 +38,8 @@ import { Kpi, Tile } from "@/components/gestao/painel";
 import { useGestao } from "@/components/gestao/contexto";
 import { Campo, Folha, Vazio, avisarMudanca, ok, useAvisos, useSomenteLeitura } from "@/components/gestao/ui";
 import { EscolherCor, GradeHorario, NOME_DIAS, ORDEM_DIAS, erroDoHorario, lerHorario } from "@/components/gestao/ajustes/grade-horario";
+import { HorarioProprio } from "@/components/gestao/ajustes/horario-proprio";
+import { areaTemHorario, chaveDoHorario, erroDoHorarioProprio, semAlmoco, servicoTemHorario, type Area } from "@/lib/gestao/horario-loja";
 import { PORTES, type Horario, type Servico } from "@/lib/gestao/tipos";
 import { brl, brlCurto, fmtTelefone, lerValor, soDigitos, mascaraTelefone, valor2 } from "@/lib/gestao/util";
 import "@/components/gestao/ajustes/ajustes.css";
@@ -400,7 +402,58 @@ function HorarioDaLoja() {
       <GradeHorario valor={horario} aoMudar={(h) => { setHorario(h); setErro(null); }} modelos />
       {erro && <p className="g-erro" role="alert">{erro}</p>}
       <div><button className="g-btn verde" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : "Salvar horário"}</button></div>
+      {(["creche", "hotel"] as const).filter((a) => usaModulo(petshop, a)).map((a) => <HorarioDaArea key={a} area={a} />)}
     </section>
+  );
+}
+
+/**
+ * O horário da creche ou do hotel: a janela de chegada e de busca de cada dia. Igual ao pet shop (o padrão) ou próprio
+ * ("domingo o pet shop fecha, mas a creche e o hotel funcionam"). Vale na Chamada, nos dias da creche, nas reservas e no link.
+ */
+function HorarioDaArea({ area }: { area: Area }) {
+  const { sb, petshop, recarregarBase } = useGestao();
+  const { avisar, avisarErro } = useAvisos();
+  const somenteLeitura = useSomenteLeitura();
+  const coluna = area === "creche" ? "horario_creche" : "horario_hotel";
+  const salvo = areaTemHorario(petshop, area) ? semAlmoco(lerHorario(petshop[coluna])) : null;
+  const [valor, setValor] = useState<Horario | null>(salvo);
+  const [erro, setErro] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
+  const nome = area === "creche" ? "da creche" : "do hotel";
+  // compara dia a dia (o banco devolve as chaves do jsonb em outra ordem)
+  const mudou = chaveDoHorario(valor) !== chaveDoHorario(salvo);
+
+  async function salvar() {
+    if (somenteLeitura()) return;
+    const problema = valor ? erroDoHorarioProprio(valor) : null;
+    setErro(problema);
+    if (problema) return;
+    setSalvando(true);
+    try {
+      // igual ao do pet shop vira "igual ao pet shop" (null): muda junto quando o pet shop mudar
+      // horário próprio fica próprio mesmo igual ao do pet shop: só "Igual ao pet shop" volta a seguir (null)
+      const guardar = valor;
+      ok(await sb.from("petshops").update(area === "creche" ? { horario_creche: guardar } : { horario_hotel: guardar }).eq("id", petshop.id).select("id"));
+      await recarregarBase();
+      avisarMudanca();
+      setValor(guardar);
+      avisar(guardar ? `Horário ${nome} salvo.` : `Pronto: ${area === "creche" ? "a creche" : "o hotel"} segue o horário do pet shop.`);
+    } catch (x) { avisarErro(x); } finally { setSalvando(false); }
+  }
+
+  return (
+    <div className="g-mp-area g-pilha p" data-teste={`horario-${area}`}>
+      <div>
+        <h3>{area === "creche" ? "Creche" : "Hotel"}</h3>
+        <p className="g-muted g-pp">{valor ? "Chegada e busca dos pets em cada dia." : `Recebe e entrega os pets no mesmo horário do pet shop.`}</p>
+      </div>
+      <HorarioProprio valor={valor} loja={petshop.horario} rotulo={`Horário ${nome}`} aberto="Recebe" teste={`horario-${area}-escolha`}
+        ajuda={`Ex.: o pet shop fecha no domingo e ${area === "creche" ? "a creche" : "o hotel"} recebe das 8h às 18h.`}
+        aoMudar={(h) => { setValor(h); setErro(null); }} />
+      {erro && <p className="g-erro" role="alert">{erro}</p>}
+      {mudou && <div><button className="g-btn verde" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : `Salvar horário ${nome}`}</button></div>}
+    </div>
   );
 }
 
@@ -462,7 +515,7 @@ function Servicos() {
               <button key={s.id} type="button" className="g-mp-serv" style={{ "--cor": s.cor } as React.CSSProperties} onClick={() => abrir(s)}>
                 <i className="g-mp-cor" aria-hidden><Scissors /></i>
                 <span className="t">
-                  <span className="g-mp-nome"><b>{s.nome}</b><span className="g-mp-tempo"><Clock aria-hidden />{duracao(s.duracao_min)}{variasAreas && areaDoServico(s.categoria) !== "banho_tosa" && ` · ${AREAS_DE_SERVICO.find((x) => x.id === areaDoServico(s.categoria))?.rotulo}`}</span></span>
+                  <span className="g-mp-nome"><b>{s.nome}</b><span className="g-mp-tempo"><Clock aria-hidden />{duracao(s.duracao_min)}{variasAreas && areaDoServico(s.categoria) !== "banho_tosa" && ` · ${AREAS_DE_SERVICO.find((x) => x.id === areaDoServico(s.categoria))?.rotulo}`}{servicoTemHorario(s) && " · horário próprio"}</span></span>
                   {p.length ? (
                     <span className="g-mp-precos">
                       {p.map((x) => <span key={x.porte} className="g-mp-preco"><i>{x.porte}</i>{brlCurto(x.valor)}</span>)}
@@ -518,6 +571,9 @@ function FolhaServico({ servico, aoFechar }: { servico: Servico | null; aoFechar
   // serviço novo já vem com uma cor que nenhum outro usa
   const [cor, setCor] = useState(servico?.cor ?? corLivre(servicos.filter((s) => s.ativo).map((s) => s.cor)));
   const [ativo, setAtivo] = useState(servico?.ativo ?? true);
+  // horário próprio do serviço (null = igual ao pet shop): só para serviço de agenda (creche e hotel têm o horário deles)
+  const [horario, setHorario] = useState<Horario | null>(() => (servicoTemHorario(servico) ? semAlmoco(lerHorario(servico!.horario)) : null));
+  const daAgenda = area !== "creche" && area !== "hotel";
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   // custo do material (só o dono lê e grava; em branco = não informado): vem do banco quando a folha abre
@@ -545,10 +601,15 @@ function FolhaServico({ servico, aoFechar }: { servico: Servico | null; aoFechar
     if (CAMPOS_PRECO.some((c) => (precosDele[c] ?? 0) < 0)) return setErro("O preço não pode ser negativo.");
     if (CAMPOS_PRECO.some((c) => (precosDele[c] ?? 0) > 99999)) return setErro("Confira os preços.");
     if (erroCusto) return setErro(`Confira o custo do material: ${erroCusto}.`);
+    const erroHorario = daAgenda && horario ? erroDoHorarioProprio(horario) : null;
+    if (erroHorario) return setErro(`Horário do serviço: ${erroHorario}`);
     setErro(null);
     setSalvando(true);
     const custoMaterial = custo.mexeu && custo.texto.trim() !== (custo.lido ?? "") ? { custo_material: custo.texto.trim() ? lerValor(custo.texto) : null } : {};
-    const campos = { nome: n.slice(0, 80), categoria: categoriaDaArea(area, servico?.categoria), duracao_min: min, cor, ativo, ...precosDele, ...custoMaterial };
+    // o horário só vai quando a pessoa mudou a escolha ou a grade (comparado dia a dia: o banco devolve o jsonb com as chaves em
+    // outra ordem). Horário próprio igual ao do pet shop continua próprio: só "Igual ao pet shop" volta a seguir (null).
+    const mexeuNoHorario = daAgenda && chaveDoHorario(horario) !== chaveDoHorario(servicoTemHorario(servico) ? servico!.horario : null);
+    const campos = { nome: n.slice(0, 80), categoria: categoriaDaArea(area, servico?.categoria), duracao_min: min, cor, ativo, ...precosDele, ...custoMaterial, ...(mexeuNoHorario ? { horario } : {}) };
     try {
       if (servico) {
         await mudarServico(sb, petshop.id, servico.id, campos);
@@ -599,6 +660,14 @@ function FolhaServico({ servico, aoFechar }: { servico: Servico | null; aoFechar
             onBlur={() => { if (!erroCusto && custo.texto.trim()) { const v = lerValor(custo.texto); if (v != null) setCusto((c) => ({ ...c, texto: valor2(v) })); } }} />
           <small>{erroCusto ? <span className="erro" role="alert">{erroCusto}</span> : "Shampoo, condicionador, perfume e o que mais gasta em cada atendimento. Entra em Relatórios, Quanto sobrou. Em branco, aparece “custo não informado”. Só você vê."}</small>
         </label>
+        {daAgenda && (
+          <div className="g-campo" data-teste="horario-do-servico">
+            <span>Horário do serviço</span>
+            <HorarioProprio valor={horario} loja={petshop.horario} rotulo="Horário do serviço" teste="horario-servico-escolha"
+              ajuda="A agenda e o link do cliente só oferecem este serviço nesses dias e horas. Com outros serviços no mesmo horário, vale a parte em que todos funcionam."
+              aoMudar={(h) => { setHorario(h); setErro(null); }} />
+          </div>
+        )}
         <div className="g-campo"><span>Cor na agenda</span><EscolherCor valor={cor} aoMudar={setCor} usadas={servicos.filter((s) => s.ativo && s.id !== servico?.id).map((s) => ({ nome: s.nome, cor: s.cor }))} /></div>
         {servico && (
           <label className="g-check">

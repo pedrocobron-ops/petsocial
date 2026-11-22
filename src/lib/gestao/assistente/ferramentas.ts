@@ -22,7 +22,7 @@ import { nomeDaCasa, nomeDaCategoria, usaModulo } from "../modulos";
 import { veCusto } from "../acessos";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Banco } from "../supabase";
-import type { Horario, Petshop, Profissional, Servico } from "../tipos";
+import type { Petshop, Profissional, Servico } from "../tipos";
 import { bloqueioPega, datasDaSerie, diasUteis, horariosLivres, vagasDe } from "../agenda";
 import { partesPorForma } from "../dinheiro";
 import { CATEGORIAS_DEVOLUCAO, faturamentoLiquido, montarAjustes } from "../faturamento";
@@ -34,6 +34,7 @@ import { anotarParcelasComRetry, idsDaOperacao, lojaPerguntaParcelas } from "../
 import { juntarServicosAMais, nomeDosServicos, valorDoHorario } from "../servicos-do-horario";
 import { parecidos } from "./parecido";
 import { lembreteDaEstadia, lembreteDoHorario } from "../lembrete-zap";
+import { horarioDoServico, horarioEmTexto, janelaDoDia, servicoTemHorario } from "../horario-loja";
 import { almocoNoDiaDaSemana, brl, fmtTelefone, lerTelefone, linkWhatsApp, precoDoServico, semAcento, soDigitos, telefoneValido, centavos, centavos as real } from "../util";
 
 /**
@@ -138,8 +139,9 @@ export const FERRAMENTAS: Def[] = ([
     input_schema: obj({ termo: { ...S, description: "Nome do pet, do tutor ou parte do telefone" } }, ["termo"]) },
   { grava: false, name: "ver_agenda", description: "Lista os horários marcados entre dois dias (inclusive), com pet, tutor, serviço, profissional, status e valor, e os bloqueios de horário do período (almoço, folga, feriado), cada um com bloqueio_id e se faz parte de uma série.",
     input_schema: obj({ de: DIA, ate: DIA }, ["de", "ate"]) },
-  { grava: false, name: "horarios_livres", description: "Mostra os horários livres de um dia, dentro do funcionamento do pet shop, para um serviço. Já desconta o tempo bloqueado e lista os bloqueios do dia. Use antes de sugerir horário ou quando o horário pedido estiver ocupado ou bloqueado.",
-    input_schema: obj({ dia: DIA, servico_id: S, profissional_id: S }, ["dia"]) },
+  { grava: false, name: "horarios_livres", description: "Mostra os horários livres de um dia para um serviço, dentro do horário dele (o próprio do serviço, quando tem, ou o do pet shop). Com outros_servicos_ids, só o que cabe no horário de todos. Já desconta o tempo bloqueado e lista os bloqueios do dia. Use antes de sugerir horário ou quando o horário pedido estiver ocupado ou bloqueado.",
+    input_schema: obj({ dia: DIA, servico_id: S, profissional_id: S,
+      outros_servicos_ids: { type: "array", items: S, description: "Opcional: os outros serviços do mesmo horário" } }, ["dia"]) },
   { grava: false, name: "clientes_sumidos", description: "Lista pets cujo último atendimento concluído foi há mais de N dias (ou que nunca vieram), com tutor e telefone.",
     input_schema: obj({ dias: { ...N, description: "Quantidade de dias sem vir, ex.: 30 ou 60" } }, ["dias"]) },
   { grava: false, name: "ver_estoque", description: "Lista produtos do estoque com saldo, mínimo e preço (kit: o saldo é quantos dá para montar). Sem termo, mostra os que estão acabando primeiro. Traz também os lotes vencidos e vencendo em 60 dias (vencendo), para \"o que está vencendo?\".",
@@ -706,9 +708,17 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
     case "horarios_livres": {
       const dia = String(e.dia);
       exigir(RE_DIA.test(dia), "Dia no formato AAAA-MM-DD.");
-      const func = (petshop.horario as Horario | null)?.[String(diaSemanaLocal(dia))];
-      if (!func) return { resultado: { fechado: true, aviso: `O pet shop não abre ${quandoLocal(dia)}.` } };
       const servico = servicoPorId(c, e.servico_id);
+      // cada serviço no horário próprio (ou no do pet shop); com vários, só o que cabe em todos
+      const doHorario = servico ? [servico, ...outrosServicosDoPedido(c, e, servico.id)] : [];
+      const proprio = doHorario.filter((x) => servicoTemHorario(x));
+      const func = janelaDoDia(doHorario.length ? doHorario.map((x) => horarioDoServico(x, petshop.horario)) : [petshop.horario], diaSemanaLocal(dia));
+      if (!func) {
+        return { resultado: { fechado: true, aviso: proprio.length
+          ? `${doHorario.length > 1 ? `${doHorario.map((x) => x.nome).join(" + ")} não funcionam juntos` : `${servico!.nome} não funciona`} ${quandoLocal(dia)} (horário próprio de ${proprio.map((x) => x.nome).join(" e ")}: ${proprio.map((x) => horarioEmTexto(x.horario)).join(" / ")}).`
+          : `O pet shop não abre ${quandoLocal(dia)}.` } };
+      }
+      const duracaoDoHorario = Math.min(1440, doHorario.reduce((t, x) => t + x.duracao_min, 0) || 60);
       const prof = profPorId(c, e.profissional_id);
       const ini = localParaUtc(`${dia}T00:00`, c.fusoMin);
       const ags = ok(await sb.from("agendamentos").select("inicio, fim, profissional_id, status").eq("petshop_id", petshop.id).gte("inicio", ini.toISOString()).lt("inicio", new Date(ini.getTime() + 864e5).toISOString()));
@@ -719,12 +729,12 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
       // sem profissional escolhido, vale o número de vagas do pet shop; com profissional, a agenda dele
       const ocupados = ags.filter((a) => !["cancelado", "faltou"].includes(a.status) && (prof ? a.profissional_id === prof.id : true)).map(emMin);
       const bloqueados = bloqueios.filter((b) => !b.profissional_id || b.profissional_id === prof?.id || quemAtende.length <= 1).map(emMin);
-      // almoço do pet shop: fechado todos os dias, sem bloqueio na agenda
-      const almoco = almocoNoDiaDaSemana(petshop.horario, diaSemanaLocal(dia));
+      // almoço do pet shop: fechado todos os dias, sem bloqueio na agenda (vale quando algum serviço segue o pet shop)
+      const almoco = proprio.length === doHorario.length && doHorario.length ? null : almocoNoDiaDaSemana(petshop.horario, diaSemanaLocal(dia));
       if (almoco) bloqueados.push({ inicio: almoco.inicio, fim: almoco.fim });
       const aPartirDe = dia === hoje ? Number(c.agora.slice(11, 13)) * 60 + Number(c.agora.slice(14, 16)) : undefined;
-      const livres = horariosLivres({ abre: func.abre, fecha: func.fecha, duracaoMin: servico?.duracao_min ?? 60, ocupados, bloqueados, vagas: prof ? 1 : vagasDe(petshop, c.equipe), aPartirDe });
-      return { resultado: { dia, funcionamento: `${func.abre} às ${func.fecha}`, ...(almoco ? { almoco: `fechado das ${almoco.de} às ${almoco.ate}` } : {}), duracao_min: servico?.duracao_min ?? 60, livres, marcados: ags.filter((a) => !["cancelado", "faltou"].includes(a.status)).length,
+      const livres = horariosLivres({ abre: func.abre, fecha: func.fecha, duracaoMin: duracaoDoHorario, ocupados, bloqueados, vagas: prof ? 1 : vagasDe(petshop, c.equipe), aPartirDe });
+      return { resultado: { dia, funcionamento: `${func.abre} às ${func.fecha}${proprio.length ? ` (horário próprio de ${proprio.map((x) => x.nome).join(" e ")})` : ""}`, ...(almoco ? { almoco: `fechado das ${almoco.de} às ${almoco.ate}` } : {}), duracao_min: duracaoDoHorario, livres, marcados: ags.filter((a) => !["cancelado", "faltou"].includes(a.status)).length,
         bloqueios: bloqueios.map((b) => bloqueioParaModelo(c, b)),
         ...(bloqueios.length || almoco ? { aviso: "Os horários livres já descontam os bloqueios e o almoço. Não ofereça horário dentro de um bloqueio nem na hora do almoço." } : {}) } };
     }
@@ -1096,10 +1106,13 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
       } else linhas.push(["Valor", preco != null ? `${brl(preco)}${inicios.length > 1 ? " cada" : ""}` : "a definir"]);
       if (e.leva_traz) linhas.push(["Leva e traz", "sim"]);
       if (texto(e.obs)) linhas.push(["Obs.", texto(e.obs, 300)]);
-      const func = (c.petshop.horario as Horario | null)?.[String(diaSemanaLocal(inicio.slice(0, 10)))];
-      if (!func) linhas.push(["Atenção", "o pet shop não abre nesse dia"]);
-      else if (inicio.slice(11) < func.abre || inicio.slice(11) >= func.fecha) linhas.push(["Atenção", `fora do horário (${func.abre} às ${func.fecha})`]);
-      {
+      // cada serviço no horário próprio (ou no do pet shop): o horário precisa caber em todos
+      const doHorario = [servico, ...outros];
+      const proprio = doHorario.some((x) => servicoTemHorario(x));
+      const func = janelaDoDia(doHorario.map((x) => horarioDoServico(x, c.petshop.horario)), diaSemanaLocal(inicio.slice(0, 10)));
+      if (!func) linhas.push(["Atenção", proprio ? `${doHorario.length > 1 ? "esses serviços não funcionam juntos" : "esse serviço não funciona"} nesse dia (horário próprio)` : "o pet shop não abre nesse dia"]);
+      else if (inicio.slice(11) < func.abre || inicio.slice(11) >= func.fecha) linhas.push(["Atenção", `fora do horário${proprio ? " do serviço" : ""} (${func.abre} às ${func.fecha})`]);
+      if (doHorario.every((x) => servicoTemHorario(x))) { /* só serviços com horário próprio: o almoço do pet shop não vale */ } else {
         // almoço do pet shop: avisa (a pessoa pode confirmar mesmo assim, como na tela)
         const noAlmoco = inicios.filter((i) => {
           const al = almocoNoDiaDaSemana(c.petshop.horario, diaSemanaLocal(i.slice(0, 10)));

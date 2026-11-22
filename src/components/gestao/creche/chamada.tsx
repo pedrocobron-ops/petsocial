@@ -1,5 +1,6 @@
 "use client";
 
+import { horarioDaCreche } from "@/lib/gestao/horario-loja";
 import { useMemo, useState } from "react";
 import { BotaoFotos } from "../casa/fotos-do-dia";
 import { BotaoBoletim, useBoletinsDeHoje } from "../boletim/boletim";
@@ -97,18 +98,18 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
   }, [petshop.id, dia, planos.length, comPortaria]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const linhas = useMemo(() => (dados ? montarChamada(planos, dia, dados.presencas, dados.faltas, petshop.horario) : []), [dados, planos, dia, petshop.horario, calendario]);
+  const linhas = useMemo(() => (dados ? montarChamada(planos, dia, dados.presencas, dados.faltas, horarioDaCreche(petshop)) : []), [dados, planos, dia, horarioDaCreche(petshop), calendario]);
   const conta = (e: LinhaChamada["estado"]) => linhas.filter((l) => l.estado === e).length;
   // boletim do dia de quem já saiu hoje (o "Boletim enviado" da linha)
   const boletins = useBoletinsDeHoje(ehHoje ? linhas.filter((l) => l.estado === "saiu" && l.presenca).map((l) => l.presenca!.id) : []);
   const naCasa = linhas.filter((l) => l.estado === "na_casa" && l.presenca?.mensalista);
-  const abre = abreNoDia(petshop.horario, dia);
+  const abre = abreNoDia(horarioDaCreche(petshop), dia);
   const emPausaHoje = planos.filter((p) => p.pets?.ativo && planoVale(p, dia) && emPausa(p, dia) && p.dias.includes(deIsoDia(dia).getDay()));
   // a conta das vagas sai das mesmas presenças do placar: depois de marcar uma reposição ou uma chegada, os dois números mudam juntos
   // (antes, o placar já mostrava quem chegou e a linha das vagas esperava a tela inteira buscar de novo)
   const ocupadas = !ehHoje || !vagasHoje ? null : !dados || !vagasHoje.avulsas ? vagasHoje.ocupadas
     : ocupadasNoDia("creche", [...vagasHoje.avulsas, ...dados.presencas.filter((e) => e.mensalista && (e.status === "reservada" || e.status === "em_casa"))], null, hoje, agora,
-      { planos, presencas: dados.presencas, faltas: dados.faltas }, petshop.horario);
+      { planos, presencas: dados.presencas, faltas: dados.faltas }, horarioDaCreche(petshop));
   const vagas = vagasHoje?.total ?? null;
 
   async function marcar(plano: PlanoCompleto, acao: Acao, opcoes: { avisou?: boolean; forcar?: boolean } = {}): Promise<boolean> {
@@ -360,7 +361,7 @@ function ForaDoDia({ planos, dia, jaVieram, saude, cheia, aoFechar, aoMarcar }: 
   const semCobrar = fechado ? conta === "sem" : reposicao;
   const alvo = semAcento(q);
   // só os mensalistas que não são esperados neste dia e ainda não foram marcados
-  const lista = planos.filter((p) => p.pets?.ativo && planoVale(p, dia) && !jaVieram.has(p.id) && !esperadoNoDia(p, dia, petshop.horario))
+  const lista = planos.filter((p) => p.pets?.ativo && planoVale(p, dia) && !jaVieram.has(p.id) && !esperadoNoDia(p, dia, horarioDaCreche(petshop)))
     .filter((p) => !alvo || semAcento(p.pets?.nome ?? "").includes(alvo) || semAcento(p.pets?.clientes?.nome ?? "").includes(alvo))
     .sort((a, b) => (a.pets?.nome ?? "").localeCompare(b.pets?.nome ?? "", "pt-BR"));
   const s = escolhido ? saude.get(escolhido.pet_id) : undefined;

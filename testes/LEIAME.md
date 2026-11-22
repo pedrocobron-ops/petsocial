@@ -20,8 +20,9 @@ ANTHROPIC_API_KEY=sk-ant-chave-falsa GESTAO_LINK_IA_FALSO=1 GESTAO_ERRO_TESTE=1 
 #    "bloqueia…" traz o cartão de bloquear o almoço de amanhã; "markdown" responde com negrito e lista; o resto, uma frase
 #    escrita palavra por palavra; "tabela de preços" traz os quatro cartões de serviço juntos (Confirmar tudo). Precisa dele:
 #    banco/mozart-rota.js, telas/mozart-consertos.js, telas/mozart-cadastros.js e telas/operacao-estoque.js ("vendi 2 mordedores",
-#    "vendi 10 pacotes de ração": cartão de vender_produto). "bloqueia o começo e o fim": dois bloqueios de amanhã numa resposta
-#    (telas/mozart-automatico.js: no modo automático, os dois são feitos em ordem).
+#    "vendi 10 pacotes de ração": cartão de vender_produto), telas/horario-servico.js ("domingo a creche e o hotel abrem das
+#    8h às 18h": dois cartões de alterar_funcionamento, alvo creche e alvo hotel). "bloqueia o começo e o fim": dois bloqueios
+#    de amanhã numa resposta (telas/mozart-automatico.js: no modo automático, os dois são feitos em ordem).
 npx next build
 ANTHROPIC_API_KEY=sk-ant-chave-falsa GESTAO_LINK_IA_FALSO=1 GESTAO_ERRO_TESTE=1 GESTAO_BOLETIM_FALSO=1 npx next start -p 3214
 
@@ -1002,3 +1003,42 @@ Outro processo testando o link ou a Cakto no mesmo banco ao mesmo tempo pode ver
 ### Link com mais de um serviço no mesmo pedido (migração 20261239)
 - `banco/link-varios-servicos.js`: Banho e tosa (90 min) + Hidratação (30) + Corte de unhas (15) pela API: `link_horarios` com `p_extras` conta os 135 min (último horário 17:30; dois pets com dois serviços, 16:00), lista com serviço de outra loja ou id inválido recusada, o pedido guarda `outros_servicos` e dura 135 min, o valor visto é a soma com a promoção só no principal (de 135,00 por 126,00, cada serviço guardado) igual à conta da página (`valorDosServicos`), outra data que não comporta os três recusada, aceitar vira UM horário com os outros serviços em `agendamento_servicos` (30,00 e 15,00) e a conta dá 126,00; dois pets (P e G) com o preço de cada porte; sem porte, faixa 95,00 a 135,00 e o porte respondido ao aceitar põe o preço em todos; pedido de um serviço só segue igual.
 - `telas/link-varios-servicos.js`: em 390x844 e 1366x900: um toque marca (✓) e outro tira, a barra de baixo com "3 serviços", 2h15 e "a partir de R$ 120", o passo 2 com os três serviços e o último horário 17:30, o valor somado (R$ 135,00) com cada serviço, o "Pedido enviado" e a página do pedido com os três, a mensagem do WhatsApp; quem recebe vê os três serviços e "o cliente viu: R$ 135,00", e Aceitar cria um horário só. `FOTOS=1` guarda as capturas em `testes/saida/link-varios-*.png`.
+
+### Horário de cada serviço e da creche e do hotel (migração 20261242)
+O pet shop tem o horário dele (`petshops.horario`); a creche e o hotel podem ter o deles (`petshops.horario_creche` e
+`horario_hotel`: a janela de chegada e de busca) e cada serviço da agenda pode ter o próprio (`servicos.horario`). null = igual ao
+pet shop. Sem almoço: o almoço do pet shop vale para os serviços que seguem o pet shop.
+- `unidade/horario-servico.js`: sem banco: creche e hotel seguem o pet shop sem horário próprio; serviço com horário próprio; vários
+  serviços valem só na parte do dia em que todos funcionam (`janelaDoDia`); a agenda abre o dia em que algum serviço funciona
+  (`horarioDaAgenda`, com o almoço do pet shop); conferência do horário próprio; o assistente do link (`abertoNoDia` com o serviço,
+  a creche ou o hotel, o contexto do link); o Mozart (`alterar_funcionamento` com `alvo`, `horarioProprioDoPedido`, as instruções,
+  o contexto com os horários e o roteiro de teste com dois cartões).
+- `banco/horario-servico.js`: pela API: a recepção e o tosador não mudam o horário da creche, do hotel nem de um serviço (o dono
+  muda); o banco recusa dia 7, fecha antes de abrir, hora fora do formato, almoço e todos os dias fechados (`horario_valido`);
+  `gestao_base` e `link_info` entregam os horários; `link_horarios` da Hidratação só no domingo 09:00–14:30 e na segunda 14:00–17:30,
+  Banho e tosa + Hidratação só 14:00–16:00, pedido fora do horário do serviço "ocupado"; a creche sem horário próprio segue o pet
+  shop (domingo fechado em `link_estadia_cheios`, `link_espera_pedir` e `link_pedir_estadia`), com o dela abre no domingo e recebe
+  às 07:00; o hotel no domingo recusado pelo pet shop e aceito com o horário dele (`fora_do_horario` com as horas do hotel).
+- `telas/horario-servico.js` (servidor com GESTAO_MOZART_FALSO=1): em 390x844 e 1366x900: Meu pet shop, "Creche", "Horário
+  próprio" com o domingo 08:00–18:00 salvo (o hotel continua "Igual ao pet shop"); a folha da Hidratação com horário próprio só no
+  domingo 09:00–15:00 e "horário próprio" na lista; o link do cliente só com os domingos abertos e horários de 09:00 a 14:30; o
+  Mozart com "Confirmar tudo (2)" grava a creche e o hotel no domingo e o pet shop continua fechado. `FOTOS=1` guarda as capturas
+  em `testes/saida/horario-servico-*.png`.
+
+### Pet com nome parecido no pedido do link (migração 20261243)
+- `unidade/pet-parecido.js`: `src/lib/gestao/pet-parecido.ts`: nome igual sem acento (Pérola = Perola) não pergunta; Thor/Tor, Mel/Melzinha, Bob/Bobby, Luna/Lua e
+  Pipoquinha/Pipoqinha perguntam; Rex/Mel e Mel/Bel não; pet inativo não entra na pergunta; com um pet só da mesma espécie a régua é um pouco mais larga
+  (Luna/Lulu); mais de um parecido (do mais perto para o mais longe, até 3); as frases "É o Thor que já está cadastrado?", "Sim, é ela", neutra sem sexo;
+  `nomeDePet` com a tabela de troca do banco (ø, ÿ, ç, ã, Ł, Đ; letra fora da tabela fica como está).
+- `banco/pet-parecido.js`: pela API, com o tosador: "  thor " e "PEROLA" usam a ficha; `p_pets` põe "Tor" no Thor (com o preço do porte da ficha); pet de
+  outro tutor, de outra loja, id inválido e `p_pets` que não é objeto são recusados (o pedido continua esperando); "Tor" sem escolha cria o pet e marca
+  `pet_novo` (tutor novo: sem marca); `pedido_trocar_pet` passa o horário e a reserva (creche e hotel) e apaga o pet criado só se não tem mais nada
+  (com outro horário, fica); recusa anônimo, outra loja, pet de outro tutor, pedido pendente e reserva em cima de outra; grupo com um pet errado não aceita
+  nenhum, e o mesmo pet para dois pedidos também não; "Era outro pet?" só por quem cuida da área (monitor recusado no horário,
+  tosador na reserva), só em pedido com pet novo, não em horário concluído nem com choque de horário do pet escolhido; pet novo
+  que ganhou raça não é apagado; porte P → M refaz o preço da lista, preço mudado à mão fica; "Jose  acento" = José (sem tutor
+  novo) e, com `p_pet`, o tutor é o dono do pet; `nome_de_pet` (banco) = `nomeDePet` (tela) em nomes com ø, ÿ, ç, Ł, Ş; as chamadas de antes (`pedidos_aceitar_juntos` sem `p_pets`, `pedido_aceitar_como` de 4 argumentos, `pedido_aceitar` só com `p_id`) seguem.
+- `telas/pet-parecido.js`: em 390x844 e 1366x900: "Tor" com o Thor na ficha pergunta "É o Thor que já está cadastrado?" (com o porte do Thor);
+  "Sim, é ele" usa o Thor (o aviso, o cartão e a confirmação no WhatsApp dizem Thor); "Thorr" → "É outro pet" cria o Thorr; "Rex" aceita sem perguntar e mostra "pet novo"; "Era outro pet?" → Mel passa o
+  horário para a Mel e apaga o Rex; pedido com "Tor", "Thorr" e "Tôr" (Thor e Thorn na ficha): o Thor escolhido no Tor fica
+  desligado no Thorr e, no Tôr, só "É outro pet" com "Thor já foi escolhido para outro pedido"; a página do pedido do tutor não mostra os pets da ficha; sem rolagem para o lado e sem erro na página.

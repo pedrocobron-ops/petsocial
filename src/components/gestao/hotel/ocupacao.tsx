@@ -1,5 +1,6 @@
 "use client";
 
+import { horarioDaCreche } from "@/lib/gestao/horario-loja";
 import { useMemo, useState } from "react";
 import Link from "@/components/gestao/link-depois";
 import { ChevronLeft, ChevronRight, Moon, Plus, Printer, Sun } from "lucide-react";
@@ -49,7 +50,7 @@ export default function Ocupacao({ abertas, mens, aoNovaReserva }: {
 
   const mensDoMes: Mens | null = useMemo(() => (mens ? { planos: mens.planos, presencas: dados?.mov?.presencas ?? mens.presencas, faltas: dados?.mov?.faltas ?? mens.faltas } : null), [mens, dados]);
   const encerradas = dados?.encerradas ?? [];
-  const conta = (tipo: string, dia: string) => ocupacaoDoDia(tipo, dia, hoje, abertas, encerradas, mensDoMes, petshop.horario);
+  const conta = (tipo: string, dia: string) => ocupacaoDoDia(tipo, dia, hoje, abertas, encerradas, mensDoMes, horarioDaCreche(petshop));
 
   function Celula({ dia, comSemana }: { dia: string; comSemana?: boolean }) {
     const d = deIsoDia(dia);
@@ -61,7 +62,7 @@ export default function Ocupacao({ abertas, mens, aoNovaReserva }: {
         {tipos.map((t) => {
           const n = conta(t, dia), v = vagasDoTipo(petshop, t);
           // dia da semana em que o negócio não abre: a creche mostra "fechado" no lugar de 0 vagas tomadas
-          if (t === "creche" && n === 0 && (!abreNoDia(petshop.horario, dia) || diaFechado(dia))) return <span key={t} className="g-ht-oc vazio"><Sun aria-hidden />fechado</span>;
+          if (t === "creche" && n === 0 && (!abreNoDia(horarioDaCreche(petshop), dia) || diaFechado(dia))) return <span key={t} className="g-ht-oc vazio"><Sun aria-hidden />fechado</span>;
           return <span key={t} className={`g-ht-oc ${nivelDeOcupacao(n, v)}`}>{t === "hotel" ? <Moon aria-hidden /> : <Sun aria-hidden />}{n}{v != null ? `/${v}` : ""}</span>;
         })}
       </button>
@@ -156,10 +157,10 @@ function DiaDaOcupacao({ dia, hoje, abertas, encerradas, mens, tipos, aoFechar, 
       <div className="g-pilha">
         {tipos.map((t) => {
           const ocupam = quemOcupa(t, dia, hoje, abertas, encerradas);
-          const total = ocupacaoDoDia(t, dia, hoje, abertas, encerradas, mens, petshop.horario);
+          const total = ocupacaoDoDia(t, dia, hoje, abertas, encerradas, mens, horarioDaCreche(petshop));
           const vagas = vagasDoTipo(petshop, t);
           // mensalistas esperados que ainda não têm estadia contando no dia
-          const esperados = t === "creche" && mens && !passado ? mens.planos.filter((p) => (!p.pets || p.pets.ativo) && esperadoNoDia(p, dia, petshop.horario)
+          const esperados = t === "creche" && mens && !passado ? mens.planos.filter((p) => (!p.pets || p.pets.ativo) && esperadoNoDia(p, dia, horarioDaCreche(petshop))
             && !mens.faltas.some((f) => f.pet_id === p.pet_id && f.dia === dia) && !ocupam.some((e) => e.pet_id === p.pet_id)).slice(0, Math.max(0, total - ocupam.length)) : [];
           return (
             <section key={t} className="g-ht-bloco">

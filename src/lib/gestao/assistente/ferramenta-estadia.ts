@@ -4,6 +4,7 @@ import type { Horario, Servico } from "../tipos";
 import { diariaSugerida } from "../hotel";
 import { nomeDaCasa, usaCasa, usaModulo } from "../modulos";
 import { brl, semAcento } from "../util";
+import { horarioDaArea } from "../horario-loja";
 
 /**
  * Mozart: reserva de creche e de hotel ("coloca a Pipoca na creche amanhã", "o Thor dorme aqui de sexta a domingo").
@@ -70,8 +71,9 @@ type Plano = { id: string; dias: number[]; inicio: string; fim: string | null; p
 type Aberta = { id: string; tipo: string; entrada: string; saida_prevista: string | null; status: string };
 type Dia = { dia: string; entrada: string; saida: string | null; extra: Plano | null };
 
-function horarioDoDia(c: Contexto, dia: string) {
-  const h = c.petshop.horario as Horario | null;
+/** O dia na creche ou no hotel: pelo horário próprio deles (Meu pet shop), ou pelo do pet shop. */
+function horarioDoDia(c: Contexto, dia: string, tipo: string) {
+  const h = horarioDaArea(c.petshop, tipo === "hotel" ? "hotel" : "creche") as Horario | null;
   const algum = [0, 1, 2, 3, 4, 5, 6].some((i) => h?.[String(i)]);
   const d = h?.[String(dow(dia))];
   return { aberto: !algum || Boolean(d && d.abre && d.fecha), abre: d?.abre ?? null, fecha: d?.fecha ?? null };
@@ -125,12 +127,12 @@ async function plano(c: Contexto, e: Entrada, erro: (m: string) => Error) {
 
   const pedidos: Dia[] = [];
   if (tipo === "creche") {
-    const nosDoPlano = dias.filter((d) => planos.some((p) => doPlano(p, d)) && horarioDoDia(c, d).aberto && !fechados.has(d));
+    const nosDoPlano = dias.filter((d) => planos.some((p) => doPlano(p, d)) && horarioDoDia(c, d, tipo).aberto && !fechados.has(d));
     if (nosDoPlano.length) throw erro(`${pet.nome} é mensalista e ${nosDoPlano.map(dataCurta).join(", ")} ${nosDoPlano.length === 1 ? "já é dia" : "já são dias"} do plano: não precisa reservar. Nada foi feito. No dia, a chegada é marcada na Chamada da creche. Se o tutor avisou que ele não vem, isso é em Creche, Mensalistas, Vai faltar.`);
-    const fechadas = dias.filter((d) => !horarioDoDia(c, d).aberto || fechados.has(d));
-    if (fechadas.length) throw erro(`A creche não abre ${fechadas.map(dataCurta).join(", ")} (horário de Meu pet shop ou dia marcado como fechado). Nada foi feito. Avise a pessoa.`);
+    const fechadas = dias.filter((d) => !horarioDoDia(c, d, tipo).aberto || fechados.has(d));
+    if (fechadas.length) throw erro(`A creche não abre ${fechadas.map(dataCurta).join(", ")} (horário da creche em Meu pet shop ou dia marcado como fechado). Nada foi feito. Avise a pessoa.`);
     for (const d of dias) {
-      const h = horarioDoDia(c, d);
+      const h = horarioDoDia(c, d, tipo);
       const bate = abertas.find((x) => ocupa(x, d, d));
       if (bate) throw erro(`${pet.nome} já tem ${bate.status === "em_casa" ? "estadia aberta" : `reserva de ${TIPO[bate.tipo]?.toLowerCase() ?? "estadia"}`} em ${dataCurta(d)}. Nada foi feito. Use ver_hospedes para conferir.`);
       const entrada = `${d}T${hora ?? h.abre?.slice(0, 5) ?? "08:00"}`;
@@ -141,12 +143,13 @@ async function plano(c: Contexto, e: Entrada, erro: (m: string) => Error) {
     const ent = dias[0];
     const bate = abertas.find((x) => ocupa(x, ent, saidaHotel!));
     if (bate) throw erro(`${pet.nome} já tem ${bate.status === "em_casa" ? "estadia aberta" : `reserva de ${TIPO[bate.tipo]?.toLowerCase() ?? "estadia"}`} nessas datas. Nada foi feito. Use ver_hospedes para conferir.`);
-    const h = horarioDoDia(c, ent), hs = horarioDoDia(c, saidaHotel!);
+    const h = horarioDoDia(c, ent, tipo), hs = horarioDoDia(c, saidaHotel!, tipo);
     pedidos.push({ dia: ent, entrada: `${ent}T${hora ?? h.abre?.slice(0, 5) ?? "08:00"}`, saida: `${saidaHotel}T${hs.fecha?.slice(0, 5) ?? "18:00"}`, extra: null });
   }
   if (pedidos[0].entrada.slice(0, 10) === hoje && pedidos[0].entrada < c.agora) pedidos[0].entrada = c.agora;
-  // dia fechado no hotel: o hotel recebe, mas a entrada ou a saída num dia fechado merece aviso
-  const avisoHotel = tipo === "hotel" ? [dias[0], saidaHotel!].filter((d) => fechados.has(d)) : [];
+  // dia fechado no hotel: o hotel recebe, mas a entrada ou a saída num dia fechado (ou em que o hotel não recebe, pelo
+  // horário do hotel em Meu pet shop) merece aviso
+  const avisoHotel = tipo === "hotel" ? [dias[0], saidaHotel!].filter((d) => fechados.has(d) || !horarioDoDia(c, d, "hotel").aberto) : [];
   const diaria = c.vejoFinanceiro ? diariaSugerida(c.petshop, tipo, pet.porte) : null;
   return { pet, tipo, pedidos, diaria, avisoHotel, obs: typeof e.obs === "string" ? e.obs.trim().slice(0, 400) || null : null };
 }
@@ -167,7 +170,7 @@ export async function descreverEstadia(c: Contexto, nome: string, e: Entrada, er
   if (c.vejoFinanceiro && !p.pedidos.every((d) => d.extra)) linhas.push(["Diária", p.diaria != null ? `${brl(p.diaria)} por ${p.tipo === "hotel" ? "noite" : "dia"} (a de Meu pet shop${p.pet.porte ? `, porte ${p.pet.porte}` : ""})` : "a combinar"]);
   if (p.obs) linhas.push(["Obs.", p.obs]);
   if (p.pet.alertas) linhas.push(["Cuidados", String(p.pet.alertas).slice(0, 300)]);
-  if (p.avisoHotel.length) linhas.push(["Atenção", `${p.avisoHotel.map(dataCurta).join(" e ")} está marcado como dia fechado`]);
+  if (p.avisoHotel.length) linhas.push(["Atenção", `${p.avisoHotel.map(dataCurta).join(" e ")} ${p.avisoHotel.length > 1 ? "são dias" : "é dia"} em que o hotel não recebe nem entrega pets (dia fechado ou horário do hotel em Meu pet shop)`]);
   return { titulo: p.tipo === "creche" ? "Reservar creche" : "Reservar hotel", linhas };
 }
 

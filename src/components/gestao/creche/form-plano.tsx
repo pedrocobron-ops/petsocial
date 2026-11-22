@@ -1,5 +1,6 @@
 "use client";
 
+import { horarioDaCreche } from "@/lib/gestao/horario-loja";
 import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -93,7 +94,7 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
   const vagas = petshop.vagas_creche;
   const porDia = mensalistasPorDia(planos, hoje, plano?.id);
   const cheios = vagas == null ? [] : diasEmOrdem(dias).filter((d) => porDia[d] >= vagas);
-  const fechados = diasEmOrdem(dias).filter((d) => !abreNoDia(petshop.horario, umDia(d)));
+  const fechados = diasEmOrdem(dias).filter((d) => !abreNoDia(horarioDaCreche(petshop), umDia(d)));
   const outro = pet && !plano ? planos.find((p) => p.pet_id === pet.id && planoAtivo(p, hoje)) : undefined;
 
   const limpar = () => setErro(null);
@@ -111,10 +112,10 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
   const vigencia = { inicio, fim: fim || null, dias, pausa_de: comPausa ? pausaDe || null : null, pausa_ate: comPausa ? pausaAte || null : null };
   // proporcional desde o começo do plano: os dias do plano no mês a partir do começo ÷ todos os dias do plano no mês × mensalidade
   // (a mesma conta da cobrança do mês e do acerto da saída). Plano que vale o mês todo: o proporcional é o mês inteiro.
-  const prop = mensal != null && dias.length ? sugestaoDoMes(vigencia, mesAtual, mensal, petshop.horario) : null;
+  const prop = mensal != null && dias.length ? sugestaoDoMes(vigencia, mesAtual, mensal, horarioDaCreche(petshop)) : null;
   // se o plano vale o mês todo (não há proporcional) não depende do valor: a opção não aparece e some antes de escolher o modelo
   // (antes ela aparecia sem valor e sumia ao tocar no modelo, e as opções mudavam de lugar sob o dedo)
-  const formaDoMes = dias.length ? sugestaoDoMes(vigencia, mesAtual, mensal ?? 100, petshop.horario) : null;
+  const formaDoMes = dias.length ? sugestaoDoMes(vigencia, mesAtual, mensal ?? 100, horarioDaCreche(petshop)) : null;
   const comecoNoMes = inicio > isoMes(mesAtual) ? inicio : null;
   const vencPadrao = (() => { const v = inicio ? vencimentoDoMes({ inicio, vence_dia: venceDia }, mesAtual) : hoje; return v < hoje ? hoje : v; })();
   const vencDaPrimeira = vencPrimeira || vencPadrao;

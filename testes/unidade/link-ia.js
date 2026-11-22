@@ -121,7 +121,7 @@ t("limparFalas: só eu/ia, corta texto, começa no cliente, termina em pergunta"
 });
 t("horarios_livres: só serviços do link, dias do link, dia aberto, 1 a 4 pets", () => {
   const d = base();
-  assert.deepEqual(L.entradaHorarios({ servico: "S1", dia: "2026-11-17", pets: 9 }, d), { ok: true, servicoId: "uuid-banho", dia: "2026-11-17", pets: 4 });
+  assert.deepEqual(L.entradaHorarios({ servico: "S1", dia: "2026-11-17", pets: 9 }, d), { ok: true, servicoId: "uuid-banho", extras: [], dia: "2026-11-17", pets: 4 });
   assert.equal(L.entradaHorarios({ servico: "uuid-banho", dia: "2026-11-17" }, d).ok, false);
   assert.equal(L.entradaHorarios({ servico: "S1", dia: "2026-11-22" }, d).ok, false); // domingo
   assert.equal(L.entradaHorarios({ servico: "S1", dia: "2026-11-20" }, d).ok, false); // fechado

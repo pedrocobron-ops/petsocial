@@ -1,5 +1,6 @@
 "use client";
 
+import { horarioDaCreche } from "@/lib/gestao/horario-loja";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Copy, MessageCircle } from "lucide-react";
@@ -63,7 +64,7 @@ function ExtratoDoCao() {
     // o plano que vale no mês (o mais recente, se teve mais de um)
     const plano = planos.filter((p) => p.pet_id === petId && (planoVale(p, mesIso) || planoVale(p, ate) || (p.inicio >= mesIso && p.inicio <= ate)))
       .sort((a, b) => b.inicio.localeCompare(a.inicio))[0] ?? null;
-    const r = plano ? resumoDoMes(plano, mes, presencas, ok(faltas) as Falta[], petshop.horario, hoje) : null;
+    const r = plano ? resumoDoMes(plano, mes, presencas, ok(faltas) as Falta[], horarioDaCreche(petshop), hoje) : null;
     const saldo = !plano ? null : plano.id === planoDaFicha ? saldoAdiantado : await lerSaldoDeReposicao(sb, plano.id);
     const repoe = new Map((saldo?.pares ?? []).map((p) => [p.reposicao, p.falta]));
     const doMes = ((cobrancas?.data ?? []) as unknown as CobrancaCompleta[]);
