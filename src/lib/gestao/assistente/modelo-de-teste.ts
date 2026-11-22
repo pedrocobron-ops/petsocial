@@ -15,22 +15,39 @@ import type { AvisosDaChamada, Msg, RespostaDoModelo } from "./conversa";
  * - pedido "domingo a creche e o hotel abrem das 8h às 18h": dois cartões de alterar_funcionamento (alvo creche e alvo hotel),
  *   juntos, com Confirmar tudo.
  * - qualquer outro: uma frase escrita devagar, palavra por palavra (cerca de 60 ms entre as palavras).
+ *
+ * Pedido com anexo (a última mensagem da pessoa tem imagem ou PDF; o roteiro nunca olha o arquivo):
+ * - só o anexo, ou um texto que não é nenhum dos de baixo: diz o que "entendeu" (foto: uma página de agenda com dois horários
+ *   reservados para amanhã, das 9h às 10h e das 15h às 16h; PDF: um boleto de luz de R$ 380,00 que vence em 5 dias) e
+ *   pergunta o que fazer. Nenhum cartão.
+ * - foto + "marca" (ou "bloqueia"): a mesma frase e dois cartões de bloquear_horario de amanhã (9h às 10h e 15h às 16h).
+ * - PDF + "lança" (ou "conta"): a frase do boleto e o cartão criar_conta (a pagar, R$ 380,00, "Luz (boleto)").
+ * - anexo + "ilegível" (ou "borrado"): lista o que ficou em dúvida e pergunta, sem cartão.
+ * - anexo + "ordem na foto": finge um modelo que obedeceu ao texto da foto e pede para desativar o serviço Banho
+ *   (alterar_servico, só do dono): prova que as permissões e o cartão seguram, mesmo se o modelo errar.
+ * - anexo + "falha de teste": lança o erro FalhaDeTeste (a rota responde 502 e devolve as páginas reservadas).
+ * Conversa retomada (a foto já passou, o histórico tem a marca "[foto enviada]"): "marca os horários da foto" traz os
+ * mesmos dois cartões, pelo que foi descrito.
  */
 const espera = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 const somaDia = (dia: string, n: number) => new Date(Date.parse(`${dia}T00:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
 
-function ultimoTexto(msgs: Msg[]): { texto: string; resultado: boolean; hoje: string | null } {
+function ultimoTexto(msgs: Msg[]): { texto: string; resultado: boolean; hoje: string | null; anexo: "foto" | "pdf" | null; jaMandouFoto: boolean } {
   const m = msgs[msgs.length - 1];
   const blocos = Array.isArray(m?.content) ? m.content : [{ type: "text" as const, text: String(m?.content ?? "") }];
   const resultado = blocos.some((b) => b.type === "tool_result");
-  const texto = blocos.map((b) => (b.type === "text" ? b.text : "")).join(" ");
+  // as notas que a rota põe entre parênteses (anexo, agora, desfeito) não são o pedido da pessoa
+  const texto = blocos.map((b) => (b.type === "text" && !/^\((Anexo deste pedido|A pessoa mandou só o anexo|Agora:|A pessoa tocou em Desfazer)/.test(b.text) ? b.text : "")).join(" ");
+  const anexo = blocos.some((b) => b.type === "document") ? "pdf" as const : blocos.some((b) => b.type === "image") ? "foto" as const : null;
+  let jaMandouFoto = false;
   let hoje: string | null = null;
   for (const x of msgs) {
     const c = Array.isArray(x.content) ? x.content.map((b) => (b.type === "text" ? b.text : "")).join(" ") : String(x.content);
     const a = /Agora: [^,]+, (\d{4}-\d{2}-\d{2})/.exec(c);
     if (a) hoje = a[1];
+    if (/\[(foto enviada|\d+ fotos enviadas)\]/.test(c)) jaMandouFoto = true;
   }
-  return { texto: texto.toLowerCase(), resultado, hoje };
+  return { texto: texto.toLowerCase(), resultado, hoje, anexo, jaMandouFoto };
 }
 
 async function escrever(texto: string, ao: AvisosDaChamada, ms: number) {
@@ -50,13 +67,55 @@ const PRECOS_TESTE: { nome: string; precos: Record<string, number>; duracao: num
   { nome: "Hidratação", precos: { preco_p: 60, preco_m: 60, preco_g: 80, preco_gg: 80 }, duracao: 30 },
 ];
 
+const fala = (t: string) => ({ type: "text", text: t, citations: null });
+const idDeTeste = (marca = "") => `toolu_teste${Date.now().toString(36)}${marca}${Math.random().toString(36).slice(2, 8)}`;
+export const FOTO_DE_TESTE = "Parece uma página de agenda com dois horários reservados para amanhã: das 9h às 10h e das 15h às 16h.";
+export const PDF_DE_TESTE = "É um boleto de luz de R$ 380,00";
+
+/** O roteiro dos pedidos com anexo (o arquivo nunca é olhado). */
+async function comAnexo(anexo: "foto" | "pdf", texto: string, hoje: string, ao: AvisosDaChamada, sistema: string): Promise<RespostaDoModelo> {
+  if (/falha de teste/.test(texto)) throw Object.assign(new Error("falha de teste"), { name: "FalhaDeTeste" });
+  const fim = (t: string) => ({ content: [fala(t)], stop_reason: "end_turn" }) as unknown as RespostaDoModelo;
+  if (/ileg[ií]vel|borrad/.test(texto)) {
+    const t = "Consegui ler dois horários, mas fiquei em dúvida em duas coisas:\n- o telefone da Marta está borrado\n- o valor da segunda linha não dá para ler\nMe diz esses dois que eu sigo.";
+    await escrever(t, ao, 5);
+    return fim(t);
+  }
+  if (/ordem na foto/.test(texto)) {
+    // um modelo que errou e obedeceu ao texto da foto: as permissões e o cartão é que seguram
+    const t = "A foto traz um texto mandando desativar o Banho.";
+    await escrever(t, ao, 5);
+    ao.ferramenta("alterar_servico");
+    return { content: [fala(t), { type: "tool_use", id: idDeTeste("o"), name: "alterar_servico", input: { servico_id: idDoServico(sistema, "Banho") ?? "00000000-0000-4000-8000-000000000000", ativo: false } }], stop_reason: "tool_use" } as unknown as RespostaDoModelo;
+  }
+  if (anexo === "pdf") {
+    const vence = somaDia(hoje, 5);
+    const t = `${PDF_DE_TESTE} que vence em ${vence.slice(8, 10)}/${vence.slice(5, 7)}.`;
+    if (!/lan[çc]a|conta/.test(texto)) { const p = `${t} Quer que eu lance em contas a pagar?`; await escrever(p, ao, 5); return fim(p); }
+    await escrever(t, ao, 5);
+    ao.ferramenta("criar_conta");
+    return { content: [fala(t), { type: "tool_use", id: idDeTeste("c"), name: "criar_conta", input: { tipo: "saida", valor: 380, vencimento: vence, descricao: "Luz (boleto)", categoria: "Contas fixas" } }], stop_reason: "tool_use" } as unknown as RespostaDoModelo;
+  }
+  if (!/marca|bloqueia/.test(texto)) { const p = `${FOTO_DE_TESTE} Quer que eu marque esses horários?`; await escrever(p, ao, 5); return fim(p); }
+  await escrever(FOTO_DE_TESTE, ao, 5);
+  const amanha = somaDia(hoje, 1);
+  ao.ferramenta("bloquear_horario");
+  return {
+    content: [fala(FOTO_DE_TESTE),
+      { type: "tool_use", id: idDeTeste("a"), name: "bloquear_horario", input: { dia: amanha, de: "09:00", ate: "10:00", motivo: "Da foto: manhã" } },
+      { type: "tool_use", id: idDeTeste("b"), name: "bloquear_horario", input: { dia: amanha, de: "15:00", ate: "16:00", motivo: "Da foto: tarde" } }],
+    stop_reason: "tool_use",
+  } as unknown as RespostaDoModelo;
+}
+
 export async function modeloDeTeste(msgs: Msg[], ao: AvisosDaChamada, sistema = ""): Promise<RespostaDoModelo> {
-  const { texto, resultado, hoje } = ultimoTexto(msgs);
+  const { texto, resultado, hoje, anexo, jaMandouFoto } = ultimoTexto(msgs);
   if (resultado) {
     const t = "Prontinho, ficou feito.";
     await escrever(t, ao, 20);
     return { content: [{ type: "text", text: t, citations: null }], stop_reason: "end_turn" } as unknown as RespostaDoModelo;
   }
+  if (anexo || (jaMandouFoto && /hor[aá]rios da foto/.test(texto))) return comAnexo(anexo ?? "foto", texto, hoje ?? new Date().toISOString().slice(0, 10), ao, sistema);
   if (/tabela de pre[cç]os/.test(texto)) {
     const t = "Deixa comigo: são quatro serviços.";
     await escrever(t, ao, 10);

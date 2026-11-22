@@ -2,7 +2,7 @@
 
 import { Selo } from "./marca";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUp, Check, CheckCheck, ChevronDown, MessageCircle, RotateCcw, SlidersHorizontal, Undo2, Volume2, VolumeX, Zap } from "lucide-react";
+import { ArrowUp, Camera, Check, CheckCheck, ChevronDown, FileText, ImagePlus, MessageCircle, Paperclip, RotateCcw, SlidersHorizontal, Undo2, Volume2, VolumeX, X, Zap } from "lucide-react";
 import { hora, isoDia } from "@/lib/gestao/util";
 import Link from "@/components/gestao/link-depois";
 import { useGestao } from "./contexto";
@@ -13,6 +13,10 @@ import { TextoMozart } from "./texto-mozart";
 import { chaveDaConversa, guardarConversa, lerConversa } from "@/lib/gestao/assistente/guardada";
 import { semNomesDeFerramenta } from "@/lib/gestao/assistente/sem-nomes";
 import { usaModulo } from "@/lib/gestao/modulos";
+import { LIMITE_DO_ENVIO_MOZART, MAX_IMAGENS_MOZART, MAX_PAGINAS_PDF_MOZART, TEXTO_ENVIO_GRANDE, TEXTO_MISTURA, TEXTO_MUITOS, TEXTO_PDF_GRANDE, TEXTO_PLANILHA, TEXTO_TIPO, ehPlanilha, textoDePaginas } from "@/lib/gestao/assistente/anexos";
+import { MAX_BYTES_PDF } from "@/lib/gestao/caderno";
+import { lerSaldo, linhaDoSaldo, textoDoLimiteDePaginas, type SaldoDePaginas } from "@/lib/gestao/limites-ia";
+import { ehHeic, paginasDoPdf, paraJpeg } from "./arquivos-ia";
 import { AVISO_AUTOMATICO, ESTADO_DESLIGADO, VERSAO_AVISO_AUTOMATICO, fraseDoDesfazer, lerEstado, type EstadoAutomatico } from "@/lib/gestao/assistente/automatico";
 
 type Resumo = { titulo: string; linhas: [string, string][] };
@@ -20,12 +24,19 @@ type Proposta = { id: string; ferramenta: string; resumo: Resumo; estado: "pende
 type LinkZap = { nome: string; texto: string; url: string };
 /** Uma ação feita no modo automático: o cartão "Feito" (os mesmos detalhes do cartão de confirmação) e o Desfazer. */
 type FeitoTela = { id: string; acao: string | null; ferramenta: string; resumo: Resumo; ok: boolean; erro?: string; estado?: "feito" | "desfazendo" | "desfeito" | "nao"; motivo?: string };
+/**
+ * Um anexo esperando para ir (foto já diminuída ou PDF): fica só na memória desta tela, com a miniatura. Depois de enviado,
+ * a conversa guarda só o rótulo ("2 fotos", "PDF · 3 páginas"); o arquivo não fica em lugar nenhum.
+ */
+type Anexo = { id: string; nome: string; pdf: boolean; blob: Blob; previa: string | null; paginas: number };
+const rotuloDosAnexos = (l: Anexo[]) => (l.some((a) => a.pdf) ? `PDF · ${l[0].paginas === 1 ? "1 página" : `${l[0].paginas} páginas`}` : l.length === 1 ? "1 foto" : `${l.length} fotos`);
 type Item =
-  | { tipo: "eu" | "ele" | "erro"; texto: string; quando?: string; saidas?: boolean; jaVisto?: boolean; interrompida?: boolean; repetir?: string }
+  | { tipo: "eu" | "ele" | "erro"; texto: string; quando?: string; saidas?: boolean; jaVisto?: boolean; interrompida?: boolean; repetir?: string;
+      /** Pedido que foi com anexo: o rótulo do que foi ("2 fotos"). */ anexo?: string; /** Resposta sobre planilha: mostra os atalhos das telas. */ planilha?: boolean }
   | { tipo: "propostas"; lista: Proposta[]; enviado: boolean }
   | { tipo: "feitos"; lista: FeitoTela[] }
   | { tipo: "links"; lista: LinkZap[] };
-type Resposta = { mensagens: unknown[]; texto: string; propostas: Omit<Proposta, "estado">[]; parciais: unknown[]; links: LinkZap[]; feitos?: FeitoTela[]; automatico?: boolean; mudou: boolean; erro?: string; mensagem?: string };
+type Resposta = { mensagens: unknown[]; texto: string; propostas: Omit<Proposta, "estado">[]; parciais: unknown[]; links: LinkZap[]; feitos?: FeitoTela[]; automatico?: boolean; mudou: boolean; erro?: string; mensagem?: string; /** Saldo de páginas do dia (pedido com anexo). */ paginas?: unknown };
 /** Um evento da resposta que chega aos poucos (uma linha JSON cada): texto, o que ele está fazendo, e o fim com tudo. */
 type Evento = { t: "texto"; d: string } | { t: "progresso"; frase: string } | ({ t: "fim"; status: number } & Partial<Resposta>);
 
@@ -105,11 +116,13 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
     // e oferece perguntar de novo (não manda sozinho: cada pedido conta). Um "Pode fazer" no meio termina sozinho (abaixo).
     if (g?.esperando && !g.decidindo) {
       const pedido = [...memoria.itens].reverse().find((i) => i.tipo === "eu");
-      const repetir = pedido && pedido.tipo === "eu" ? pedido.texto : undefined;
+      // pedido com anexo: o arquivo não fica guardado, então não dá para perguntar de novo sozinho
+      const comAnexo = Boolean(pedido && pedido.tipo === "eu" && pedido.anexo);
+      const repetir = pedido && pedido.tipo === "eu" && !comAnexo ? pedido.texto : undefined;
       if (g.interrompida) memoria.itens = [...memoria.itens, { tipo: "ele", texto: g.interrompida, interrompida: true }];
-      memoria.itens = [...memoria.itens, { tipo: "erro", texto: g.interrompida
+      memoria.itens = [...memoria.itens, { tipo: "erro", texto: `${g.interrompida
         ? "A página recarregou antes de o Mozart terminar: a resposta acima ficou pela metade."
-        : "A página recarregou antes da resposta do Mozart.", repetir }];
+        : "A página recarregou antes da resposta do Mozart."}${comAnexo ? " Se precisar, mande o anexo de novo." : ""}`, repetir }];
     }
   }
   const [itens, setItens] = useState<Item[]>(memoria.itens);
@@ -173,6 +186,20 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
   const [mudandoAuto, setMudandoAuto] = useState(false);
   const [erroAuto, setErroAuto] = useState<string | null>(null);
   const caixaAuto = useRef<HTMLInputElement>(null);
+  // anexos: as fotos (já diminuídas) ou o PDF que vão com o próximo pedido, o aviso do que não deu para anexar, o menu do
+  // botão e o saldo de páginas do dia (o mesmo da Foto do caderno)
+  const [anexos, setAnexos] = useState<Anexo[]>([]);
+  const anexosAgora = useRef(anexos);
+  anexosAgora.current = anexos;
+  const [preparandoAnexo, setPreparandoAnexo] = useState(false);
+  const [erroAnexo, setErroAnexo] = useState<string | null>(null);
+  const [menuAnexo, setMenuAnexo] = useState(false);
+  const [saldo, setSaldo] = useState<SaldoDePaginas | null>(null);
+  const saldoAgora = useRef(saldo);
+  saldoAgora.current = saldo;
+  const botaoAnexo = useRef<HTMLButtonElement>(null);
+  const menuDoAnexo = useRef<HTMLDivElement>(null);
+  const entradaCamera = useRef<HTMLInputElement>(null), entradaGaleria = useRef<HTMLInputElement>(null), entradaArquivo = useRef<HTMLInputElement>(null);
 
   const guardar = (novos: Item[]) => { memoria.itens = novos; setItens(novos); persistir(); };
   const acrescentar = (...novos: Item[]) => guardar([...memoria.itens, ...novos]);
@@ -181,8 +208,25 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
     setTemLeituraAqui(temLeitura());
     painelAberto = true;
     persistir();
-    return () => { window.clearInterval(relogioEnvio.current); pararDeFalar(); painelAberto = false; persistir(); };
+    return () => { window.clearInterval(relogioEnvio.current); pararDeFalar(); painelAberto = false; persistir(); anexosAgora.current.forEach((a) => a.previa && URL.revokeObjectURL(a.previa)); };
   }, []);
+  // quanto ainda dá para ler hoje (sem gastar nada): a tela avisa perto do botão de anexo quando está acabando
+  useEffect(() => {
+    let vale = true;
+    void Promise.resolve(sb.rpc("mozart_anexo_reservar", { p_petshop: petshop.id, p_paginas: 0 })).then((r) => {
+      const c = r.data as { ok?: boolean } | null;
+      if (vale && !r.error && c?.ok) setSaldo(lerSaldo(c));
+    }, () => undefined);
+    return () => { vale = false; };
+  }, [sb, petshop.id]);
+  useEffect(() => {
+    if (!menuAnexo) return;
+    menuDoAnexo.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    // toque fora do menu fecha (o toque numa opção é dentro: abre a câmera, a galeria ou os arquivos)
+    const fora = (e: PointerEvent) => { if (!(e.target instanceof Node) || !botaoAnexo.current?.parentElement?.contains(e.target)) setMenuAnexo(false); };
+    document.addEventListener("pointerdown", fora);
+    return () => document.removeEventListener("pointerdown", fora);
+  }, [menuAnexo]);
   useEffect(() => { fim.current?.scrollIntoView({ block: "end" }); }, [itens, pensando, aoVivo]);
   useEffect(() => {
     let vivo = true;
@@ -198,7 +242,7 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
     return () => { document.documentElement.style.overflow = antes; document.removeEventListener("keydown", tecla); };
   }, [aoFechar]);
 
-  const chamar = useCallback(async (corpo: Record<string, unknown>) => {
+  const chamar = useCallback(async (corpo: Record<string, unknown>, arquivos?: Anexo[]) => {
     setPensando(true);
     // a linha do que ele está fazendo aparece na hora, antes de qualquer resposta do servidor
     const primeiraFrase = corpo.decisoes ? (corpo.retomando ? "Terminando a resposta que foi interrompida…" : "Fazendo o que você confirmou…") : "Pensando…";
@@ -218,14 +262,24 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
       const agora = new Date();
       // pede a resposta aos poucos (pelo Accept); o servidor pode responder de uma vez (JSON), e as duas formas funcionam
       const aosPoucos = typeof ReadableStream === "function" && typeof TextDecoder === "function";
+      const dados = JSON.stringify({
+        petshopId: petshop.id, mensagens: memoria.mensagens,
+        agora: `${isoDia(agora)}T${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`,
+        fusoMin: -agora.getTimezoneOffset(), ...corpo,
+      });
+      // com anexo, o pedido vai em formulário (o JSON de sempre em "dados" e os arquivos em "arquivo"); o navegador põe o tipo
+      let envio: BodyInit = dados;
+      if (arquivos?.length) {
+        const form = new FormData();
+        form.set("dados", dados);
+        form.set("paginas", String(arquivos.find((a) => a.pdf)?.paginas ?? 0));
+        arquivos.forEach((a) => form.append("arquivo", a.blob, a.pdf ? a.nome : `${a.id}.jpg`));
+        envio = form;
+      }
       const r = await fetch("/api/gestao/assistente", {
         method: "POST",
-        headers: { "content-type": "application/json", accept: aosPoucos ? "application/x-ndjson, application/json" : "application/json", authorization: `Bearer ${data.session?.access_token ?? ""}` },
-        body: JSON.stringify({
-          petshopId: petshop.id, mensagens: memoria.mensagens,
-          agora: `${isoDia(agora)}T${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`,
-          fusoMin: -agora.getTimezoneOffset(), ...corpo,
-        }),
+        headers: { ...(arquivos?.length ? {} : { "content-type": "application/json" }), accept: aosPoucos ? "application/x-ndjson, application/json" : "application/json", authorization: `Bearer ${data.session?.access_token ?? ""}` },
+        body: envio,
       });
       let j: Resposta | null;
       let status = r.status;
@@ -254,9 +308,13 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
       // o Mozart não respondeu: a frase do servidor (sem detalhe técnico) e o caminho para seguir sem ele
       if (saindo) return;
       memoria.decidindo = null; memoria.esperando = false;
+      // o saldo de páginas do dia depois deste pedido (vem com a resposta e com a recusa por limite)
+      if (j?.paginas) { const s = lerSaldo(j.paginas); if (s) setSaldo(s); }
       if (status >= 400 || !j || j.erro) {
         if (status === 499) { persistir(); return; }
-        acrescentar({ tipo: "erro", texto: j?.mensagem || "Não consegui falar com o Mozart agora. Tente de novo em instantes.", saidas: status >= 500 });
+        acrescentar({ tipo: "erro", texto: j?.mensagem || (status === 413 && arquivos?.length ? "Os arquivos são grandes demais para mandar de uma vez. Mande menos de cada vez." : "Não consegui falar com o Mozart agora. Tente de novo em instantes."), saidas: status >= 500 });
+        // o Mozart não chegou a ler (fora do ar, sem resposta): o anexo volta para a caixa, para tentar de novo
+        if (arquivos?.length && status >= 500 && !anexosAgora.current.length) { setAnexos(arquivos); arquivos = undefined; }
         return;
       }
       memoria.mensagens = j.mensagens;
@@ -280,7 +338,10 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
       if (saindo) return;
       memoria.decidindo = null; memoria.esperando = false;
       acrescentar({ tipo: "erro", texto: textoDeRede(!semInternet()) });
+      if (arquivos?.length && !anexosAgora.current.length) { setAnexos(arquivos); arquivos = undefined; }
     } finally {
+      // as miniaturas do que foi (e não voltou para a caixa) saem da memória
+      arquivos?.forEach((a) => a.previa && URL.revokeObjectURL(a.previa));
       // o texto falado até aqui termina (resposta com erro ou só cartão)
       if (voz.atual) voz.atual.terminar();
       if (!saindo) textoAoVivo = "";
@@ -297,7 +358,18 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
   const enviar = useCallback((t: string) => {
     const limpo = t.trim();
     cancelarEnvio();
-    if (!limpo) return;
+    const arquivos = anexosAgora.current;
+    if (!limpo && !arquivos.length) return;
+    if (arquivos.length) {
+      // o anexo não entra na fila: espera o Mozart terminar (o texto fica na caixa)
+      if (pensando) { setAvisoFila("O Mozart ainda está respondendo. Assim que ele terminar, toque em enviar para mandar o anexo."); return; }
+      // sem saldo para estas páginas: avisa antes de mandar (nada é gasto)
+      const s = saldoAgora.current, paginas = arquivos.reduce((n, a) => n + a.paginas, 0);
+      if (s && paginas > s.restam) { setErroAnexo(textoDoLimiteDePaginas(s)); return; }
+      setAnexos([]); setErroAnexo(null); setMenuAnexo(false);
+    }
+    const anexo = arquivos.length ? rotuloDosAnexos(arquivos) : undefined;
+    const pedir = () => chamar({ texto: limpo }, arquivos.length ? arquivos : undefined);
     setTexto("");
     setAvisoFila(null);
     // o Mozart ainda está respondendo (por exemplo, fazendo um "Pode fazer"): a mensagem não se perde, entra na fila
@@ -306,15 +378,15 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
     const abertos = memoria.itens.find((i) => i.tipo === "propostas" && !i.enviado);
     if (abertos && abertos.tipo === "propostas") {
       guardar(memoria.itens.map((i) => (i === abertos ? { ...abertos, enviado: true, lista: abertos.lista.map((p) => ({ ...p, estado: p.estado === "pendente" ? ("nao" as const) : p.estado })) } : i)));
-      acrescentar({ tipo: "eu", texto: limpo, quando: hora(new Date()) });
+      acrescentar({ tipo: "eu", texto: limpo, quando: hora(new Date()), anexo });
       void (async () => {
         await chamar({ decisoes: abertos.lista.map((p) => ({ id: p.id, ok: false })), parciais: memoria.parciais });
-        await chamar({ texto: limpo });
+        await pedir();
       })();
       return;
     }
-    acrescentar({ tipo: "eu", texto: limpo, quando: hora(new Date()) });
-    void chamar({ texto: limpo });
+    acrescentar({ tipo: "eu", texto: limpo, quando: hora(new Date()), anexo });
+    void pedir();
   }, [pensando, chamar, cancelarEnvio]); // eslint-disable-line react-hooks/exhaustive-deps
   const enviarAgora = useRef(enviar);
   enviarAgora.current = enviar;
@@ -385,6 +457,71 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
     void chamar({ decisoes: d.decisoes, parciais: d.parciais, retomando: true });
   }, [chamar]);
 
+  /**
+   * A pessoa escolheu arquivos (câmera, galeria ou arquivo): confere aqui o que dá para conferir antes de gastar qualquer
+   * coisa (tipo, quantidade, tamanho, páginas do PDF), diminui as fotos e mostra a miniatura. Planilha não entra: o Mozart
+   * responde na hora apontando a tela Trazer de planilha (sem chamar o servidor).
+   */
+  async function anexar(lista: FileList | null) {
+    if (!lista?.length) return;
+    setErroAnexo(null); setMenuAnexo(false); setPreparandoAnexo(true);
+    const atuais = anexosAgora.current;
+    const novos: Anexo[] = [];
+    const problemas: string[] = [];
+    let imagens = atuais.filter((a) => !a.pdf).length, pdfs = atuais.length - imagens;
+    let peso = atuais.reduce((n, a) => n + a.blob.size, 0);
+    const id = () => Math.random().toString(36).slice(2, 10);
+    for (const f of Array.from(lista)) {
+      if (ehPlanilha(f.name, f.type)) {
+        acrescentar({ tipo: "eu", texto: `Planilha: ${f.name}`, quando: hora(new Date()) }, { tipo: "ele", texto: TEXTO_PLANILHA, quando: hora(new Date()), planilha: true });
+        continue;
+      }
+      const pdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name);
+      if (pdf) {
+        if (imagens) { problemas.push(TEXTO_MISTURA); continue; }
+        if (pdfs) { problemas.push(TEXTO_MUITOS); continue; }
+        if (f.size > MAX_BYTES_PDF) { problemas.push(TEXTO_PDF_GRANDE); continue; }
+        if (f.size > LIMITE_DO_ENVIO_MOZART) { problemas.push(TEXTO_ENVIO_GRANDE); continue; }
+        const n = await paginasDoPdf(f);
+        if (n > MAX_PAGINAS_PDF_MOZART) { problemas.push(textoDePaginas(n)); continue; }
+        pdfs++; peso += f.size;
+        novos.push({ id: id(), nome: f.name || "arquivo.pdf", pdf: true, blob: f, previa: null, paginas: Math.max(n, 1) });
+        continue;
+      }
+      if (pdfs) { problemas.push(TEXTO_MISTURA); continue; }
+      if (imagens >= MAX_IMAGENS_MOZART) { problemas.push(TEXTO_MUITOS); continue; }
+      if (f.type && !f.type.startsWith("image/")) { problemas.push(TEXTO_TIPO); continue; }
+      try {
+        const b = await paraJpeg(f);
+        if (peso + b.size > LIMITE_DO_ENVIO_MOZART) { problemas.push("As fotos juntas ficaram pesadas demais para mandar de uma vez. Mande menos fotos de cada vez."); continue; }
+        imagens++; peso += b.size;
+        novos.push({ id: id(), nome: f.name || "Foto", pdf: false, blob: b, previa: URL.createObjectURL(b), paginas: 1 });
+      } catch {
+        problemas.push(ehHeic(f)
+          ? "Esta foto está em HEIC, o formato das fotos do iPhone, e este navegador não abre esse formato. Abra o Maestro no Safari do iPhone e mande de lá, ou tire um print da foto e mande o print."
+          : f.type ? "Não consegui abrir essa foto. Tire de novo pela câmera ou mande um print." : TEXTO_TIPO);
+      }
+    }
+    if (novos.length) setAnexos((a) => [...a, ...novos]);
+    if (problemas.length) setErroAnexo([...new Set(problemas)].join(" "));
+    setPreparandoAnexo(false);
+    if (novos.length) caixa.current?.focus();
+  }
+  function tirarAnexo(id: string) {
+    setErroAnexo(null);
+    setAnexos((a) => { const x = a.find((y) => y.id === id); if (x?.previa) URL.revokeObjectURL(x.previa); return a.filter((y) => y.id !== id); });
+    botaoAnexo.current?.focus();
+  }
+  /** Teclado no menu do anexo: setas andam entre as opções; Esc fecha e devolve o foco ao botão (sem fechar a conversa). */
+  function teclaNoMenuDoAnexo(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key === "Escape") { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); setMenuAnexo(false); botaoAnexo.current?.focus(); return; }
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const bts = Array.from(menuDoAnexo.current?.querySelectorAll<HTMLButtonElement>("button") ?? []);
+    const i = bts.indexOf(document.activeElement as HTMLButtonElement);
+    bts[(i + (e.key === "ArrowDown" ? 1 : bts.length - 1)) % bts.length]?.focus();
+  }
+
   function decidir(grupo: Extract<Item, { tipo: "propostas" }>, id: string, sim: boolean) {
     // toque duplo em "Pode fazer": o segundo toque chega antes de a tela desligar o botão; a resposta só vai uma vez
     const grupoId = grupo.lista.map((p) => p.id).join(",");
@@ -440,6 +577,8 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
 
   function novaConversa() {
     cancelarEnvio(); pararDeFalar(); setLendo(null); setSemVoz(null);
+    anexosAgora.current.forEach((a) => a.previa && URL.revokeObjectURL(a.previa));
+    setAnexos([]); setErroAnexo(null); setMenuAnexo(false);
     memoria.itens = []; memoria.mensagens = []; memoria.parciais = []; memoria.decidindo = null; memoria.esperando = false;
     setItens([]);
     persistir();
@@ -554,7 +693,14 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
             </div>
           ) : (
             <div key={i} className={`g-bolha ${item.tipo === "eu" ? "eu" : "ela"}${item.tipo === "erro" ? " erro" : ""}${item.jaVisto ? " ja" : ""}${itens[i - 1]?.tipo !== item.tipo ? " rabo" : ""}`}>
+              {item.tipo === "eu" && item.anexo && <span className="g-ass-anexado"><Paperclip size={14} aria-hidden />{item.anexo}<span className="g-so-leitor"> em anexo.</span></span>}
               {item.tipo === "ele" ? <TextoMozart texto={item.texto} /> : item.texto}
+              {item.tipo === "ele" && item.planilha && (
+                <span className="g-ass-saidas">
+                  {posso("clientes") && <><Link className="g-link alvo" href="/gestao/app/clientes" onClick={aoFechar}>Abrir Clientes e pets</Link>{posso("estoque") ? " · " : ""}</>}
+                  {posso("estoque") && <Link className="g-link alvo" href="/gestao/app/estoque" onClick={aoFechar}>Abrir o Estoque</Link>}
+                </span>
+              )}
               {item.tipo === "ele" && item.interrompida && <span className="g-ass-sem-voz">Resposta interrompida</span>}
               {item.tipo === "erro" && item.repetir && i === itens.length - 1 && !pensando && (
                 <span className="g-ass-saidas">
@@ -602,18 +748,53 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
             </>
           )}
         </FaixaVoz>
+        {(anexos.length > 0 || preparandoAnexo || erroAnexo || linhaDoSaldo(saldo)) && (
+          <div className="g-ass-anexos">
+            {anexos.length > 0 && (
+              <ul aria-label="Anexos para enviar">
+                {anexos.map((a, n) => (
+                  <li key={a.id} className={a.pdf ? "pdf" : undefined}>
+                    {a.previa ? <img src={a.previa} alt={`Foto ${n + 1} para enviar`} /> : <span className="ico"><FileText aria-hidden /></span>}
+                    {a.pdf && <span className="nome">{a.nome}<small>{a.paginas === 1 ? "1 página" : `${a.paginas} páginas`}</small></span>}
+                    <button type="button" onClick={() => tirarAnexo(a.id)} aria-label={a.pdf ? `Tirar o PDF ${a.nome}` : `Tirar a foto ${n + 1}`} title="Tirar"><X aria-hidden /></button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {preparandoAnexo && <p role="status">Preparando o anexo…</p>}
+            {erroAnexo && <p className="erro" role="alert">{erroAnexo}</p>}
+            {!erroAnexo && linhaDoSaldo(saldo) && <p role="status" data-saldo>{linhaDoSaldo(saldo)}</p>}
+          </div>
+        )}
         <form className="g-ass-entrada" onSubmit={(e) => { e.preventDefault(); enviar(texto); }}>
-          <textarea ref={caixa} rows={1} value={texto} placeholder={ditado.ouvindo ? "Estou ouvindo…" : pensando ? "Escreva: vai na fila" : temPendente ? "Confirme ou peça ajuste" : "Mensagem"} aria-label="Seu pedido"
+          <textarea ref={caixa} rows={1} value={texto} placeholder={ditado.ouvindo ? "Estou ouvindo…" : anexos.length ? "Diga o que fazer" : pensando ? "Escreva: vai na fila" : temPendente ? "Confirme ou peça ajuste" : "Mensagem"} aria-label="Seu pedido"
             readOnly={ditado.ouvindo}
             onPointerDown={() => { if (contagem !== null) cancelarEnvio(); }}
             onFocus={() => { if (contagem !== null) cancelarEnvio(); }}
             onChange={(e) => { cancelarEnvio(); setTexto(e.target.value); }}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(texto); } }} />
-          {ditado.suportado && (ditado.ouvindo || !texto.trim()) && (
-            <BotaoMic ditado={ditado} jaEscrito={() => textoAgora.current} antesDeComecar={() => { cancelarEnvio(); setLendo(null); }} />
+          {!ditado.ouvindo && (
+            <div className="g-ass-clipe" onKeyDown={teclaNoMenuDoAnexo}>
+              <button ref={botaoAnexo} type="button" className="g-ass-clipe-bt" aria-label="Anexar foto ou PDF" aria-haspopup="menu" aria-expanded={menuAnexo} title="Anexar foto ou PDF"
+                onClick={() => setMenuAnexo((m) => !m)}><Paperclip aria-hidden /></button>
+              {menuAnexo && (
+                <div ref={menuDoAnexo} className="g-ass-clipe-menu" role="menu" aria-label="Anexar">
+                  <button type="button" role="menuitem" onClick={() => entradaCamera.current?.click()}><Camera aria-hidden />Tirar foto</button>
+                  <button type="button" role="menuitem" onClick={() => entradaGaleria.current?.click()}><ImagePlus aria-hidden />Fotos da galeria</button>
+                  <button type="button" role="menuitem" onClick={() => entradaArquivo.current?.click()}><FileText aria-hidden />Arquivo (foto ou PDF)</button>
+                  <small>Até {MAX_IMAGENS_MOZART} fotos, ou 1 PDF de até {MAX_PAGINAS_PDF_MOZART} páginas. O arquivo não fica guardado.</small>
+                </div>
+              )}
+              <input ref={entradaCamera} type="file" accept="image/*" capture="environment" hidden tabIndex={-1} data-anexo="camera" onChange={(e) => { void anexar(e.target.files); e.target.value = ""; }} />
+              <input ref={entradaGaleria} type="file" accept="image/*" multiple hidden tabIndex={-1} data-anexo="galeria" onChange={(e) => { void anexar(e.target.files); e.target.value = ""; }} />
+              <input ref={entradaArquivo} type="file" accept="image/*,application/pdf,.pdf" multiple hidden tabIndex={-1} data-anexo="arquivo" onChange={(e) => { void anexar(e.target.files); e.target.value = ""; }} />
+            </div>
           )}
-          {(!ditado.suportado || (texto.trim() && !ditado.ouvindo)) && (
-            <button className="g-mic enviar" disabled={!texto.trim()} aria-label={pensando ? "Enviar quando o Mozart terminar" : "Enviar"}><ArrowUp /></button>
+          {ditado.suportado && (ditado.ouvindo || !texto.trim()) && (
+            <BotaoMic ditado={ditado} jaEscrito={() => textoAgora.current} antesDeComecar={() => { cancelarEnvio(); setLendo(null); setMenuAnexo(false); }} />
+          )}
+          {(!ditado.suportado || ((texto.trim() || anexos.length > 0) && !ditado.ouvindo)) && (
+            <button className="g-mic enviar" disabled={(!texto.trim() && !anexos.length) || preparandoAnexo} aria-label={pensando ? "Enviar quando o Mozart terminar" : anexos.length ? "Enviar com o anexo" : "Enviar"}><ArrowUp /></button>
           )}
         </form>
         {avisoAuto && (

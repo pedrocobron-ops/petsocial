@@ -36,8 +36,12 @@ export const caminhoTemporarioValido = (c: string, petshopId: string) =>
   /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.pdf$/.test(c) && c.startsWith(`${petshopId.toLowerCase()}/`);
 /** Lado maior da foto depois de diminuída no aparelho (a leitura não ganha nada acima disso). */
 export const LADO_DA_FOTO = 1600;
-/** Padrão do limite do dia por pet shop (o banco usa config_interna 'caderno_dia'). */
-export const LIMITE_DIA_PADRAO = 30;
+/**
+ * Padrão do limite do dia por pet shop: 20 páginas para quem paga (config_interna 'caderno_dia') e 10 no teste grátis
+ * ('caderno_teste_dia'). O saldo é um só com os anexos do Mozart (migração 20261248); quem diz o número em vigor é o banco.
+ */
+export const LIMITE_DIA_PADRAO = 20;
+export const LIMITE_DIA_TESTE_PADRAO = 10;
 
 export type PetLido = { nome: string; especie: "cao" | "gato" | "outro"; raca: string; porte: "P" | "M" | "G" | "GG" | null };
 export type ClienteLido = { nome: string; telefone: string; pets: PetLido[]; obs: string; duvida: boolean };
@@ -57,7 +61,7 @@ export type CuidadoLido = { tipo: TipoCuidado; nome: string; aplicado: string | 
 export type Leitura = { pagina: string; clientes: ClienteLido[]; dividas: DividaLida[]; agenda: HorarioLido[]; servicos: ServicoLido[]; vacinas: CuidadoLido[]; duvidas: string[] };
 
 /** Resposta da rota. */
-export type RespostaCaderno = { leitura: Leitura; restam: number; limite: number; paginas: number } | { erro: string; mensagem: string; restam?: number; limite?: number };
+export type RespostaCaderno = { leitura: Leitura; restam: number; limite: number; pago?: number; teste?: boolean; paginas: number } | { erro: string; mensagem: string; restam?: number; limite?: number; pago?: number; teste?: boolean };
 
 const dois = (n: number) => String(n).padStart(2, "0");
 const iso = (a: number, m: number, d: number) => `${a}-${dois(m)}-${dois(d)}`;

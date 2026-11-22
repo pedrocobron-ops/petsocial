@@ -4,18 +4,23 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { bancoDoUsuario, configurado } from "@/lib/gestao/supabase";
 import { ferramentasPara, type Contexto } from "@/lib/gestao/assistente/ferramentas";
-import { contaLiberada, limitesDaChamada, medidasZeradas, responderCartoes, voltas, type Msg, type Resultado } from "@/lib/gestao/assistente/conversa";
+import { DEMOROU, contaLiberada, limitesDaChamada, medidasZeradas, responderCartoes, voltas, type Msg, type Resultado } from "@/lib/gestao/assistente/conversa";
 import { INSTRUCOES, contextoDoPetshop } from "@/lib/gestao/assistente/instrucoes";
 import { modeloDeTeste } from "@/lib/gestao/assistente/modelo-de-teste";
 import { comRegistro, erroDoBanco, registrarErroServidor } from "@/lib/gestao/erros-servidor";
 import { garantirTrava, segredoDoServidor } from "@/lib/gestao/servidor";
 import { desfeitosDaConversa, estadoDoAutomatico, gravarNoAutomatico } from "@/lib/gestao/assistente/automatico-servidor";
+import { SO_O_ANEXO, notaDoAnexo, pedidoComMarca } from "@/lib/gestao/assistente/anexos";
+import { arquivosDoFormulario, conferirAnexos, tirarArquivos, type Anexos } from "@/lib/gestao/assistente/anexos-servidor";
+import { lerSaldo, textoDoLimiteDePaginas, textoDoLimiteDoMozart, type LimiteDoBanco, type SaldoDePaginas } from "@/lib/gestao/limites-ia";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 /** Modelo do assistente (variável na Vercel). */
 const MODELO = process.env.GESTAO_MODELO ?? "claude-haiku-5-5";
+/** Modelo dos pedidos com foto, print ou PDF (variável na Vercel). Sem ela, o mesmo modelo do assistente. */
+const MODELO_ANEXO = process.env.GESTAO_MODELO_ANEXO || MODELO;
 /** Só para testes automáticos: o Mozart responde por um roteiro fixo, sem chamar o modelo. Nunca vale na Vercel. */
 const DE_TESTE = process.env.GESTAO_MOZART_FALSO === "1" && !process.env.VERCEL;
 /** Pedidos por pet shop por dia: segura o custo de uma conta que dispare. */
@@ -34,7 +39,8 @@ type Corpo = {
 /** O que a pessoa lê quando a inteligência artificial não está disponível (o motivo técnico vai só para o registro). */
 const FORA_DO_AR = "O Mozart está fora do ar agora. Enquanto isso, tudo funciona pelos botões das telas, e o Manual, no menu, explica cada passo. Tente de novo mais tarde.";
 
-const erro = (status: number, codigo: string, mensagem: string) => NextResponse.json({ erro: codigo, mensagem }, { status });
+const erro = (status: number, codigo: string, mensagem: string, extra?: Record<string, unknown>) => NextResponse.json({ erro: codigo, mensagem, ...extra }, { status });
+/** Banco antes da migração 20261248 (a contagem não diz os números do limite): a frase de antes. */
 const LIMITE_TEXTO = "Por hoje o Mozart já atendeu todos os pedidos que cabem num dia. Amanhã cedo ele volta. Enquanto isso, tudo funciona pelos botões das telas, e o Manual, no menu, explica cada passo.";
 /** O teto do dia somando todos os pet shops (config_interna mozart_dia_geral): não é culpa de quem está pedindo. */
 const LIMITE_GERAL_TEXTO = "O Mozart recebeu pedidos demais hoje, de todos os pet shops juntos, e precisou parar para descansar. Amanhã cedo ele volta. Enquanto isso, tudo funciona pelos botões das telas, e o Manual, no menu, explica cada passo.";
@@ -42,7 +48,12 @@ const LIMITE_GERAL_TEXTO = "O Mozart recebeu pedidos demais hoje, de todos os pe
 const FECHADO_TEXTO = "O Mozart atende quem está no teste grátis ou com a assinatura em dia. A sua conta está só para consulta: os dados continuam aqui, nas telas. Para voltar a usar o Mozart, veja a tela Assinatura.";
 /** Teste grátis com o e-mail do dono ainda não confirmado (assistente_contar_v2, motivo 'email', migração 20261245). */
 const EMAIL_TEXTO = "No teste grátis, o Mozart começa a atender depois que o e-mail do dono da conta é confirmado. Para confirmar, saia, toque em \"Esqueci a senha\" na tela de entrar e abra o link que chega no e-mail. Enquanto isso, tudo funciona pelos botões das telas.";
-const textoDoLimite = (motivo: string | null) => (motivo === "fechado" ? FECHADO_TEXTO : motivo === "email" ? EMAIL_TEXTO : motivo === "geral" ? LIMITE_GERAL_TEXTO : LIMITE_TEXTO);
+/** O limite do dia do pet shop sai com os números que o banco devolveu (teste: 50 por dia e os 150 do plano pago; quem paga: 150). */
+const textoDoLimite = (motivo: string | null, numeros?: LimiteDoBanco | null) => (motivo === "fechado" ? FECHADO_TEXTO : motivo === "email" ? EMAIL_TEXTO : motivo === "geral" ? LIMITE_GERAL_TEXTO : textoDoLimiteDoMozart(numeros) ?? LIMITE_TEXTO);
+/** O modelo recusou o pedido (com anexo, as páginas reservadas voltam). */
+const RECUSA_TEXTO = "Com isso eu não consigo ajudar. Posso cuidar da agenda, dos clientes, do caixa e do estoque.";
+/** O teto de páginas do dia somando todos os pet shops (caderno_dia_geral): não é culpa de quem está pedindo. */
+const PAGINAS_GERAL_TEXTO = "A leitura de fotos e PDF recebeu pedidos demais hoje, de todos os pet shops juntos. Amanhã ela volta. Enquanto isso, dá para escrever ou falar o pedido.";
 
 type Bloco = Record<string, unknown>;
 const ehTexto = (v: unknown, max = 8000) => typeof v === "string" && v.length <= max;
@@ -102,6 +113,13 @@ function agoraNoFuso(fuso: string) {
  *                                     ou, se deu errado, {"t":"fim","status":429|502|503|500,"erro":…,"mensagem":…}
  * Sem isso (ou com GESTAO_MOZART_STREAM=0 no servidor), responde de uma vez em JSON, como sempre.
  * Erros antes de chamar o modelo (login, pedido vazio, limite do dia) vêm sempre em JSON com o status de antes.
+ *
+ * Pedido com anexo (fotos, prints ou PDF): vem em multipart/form-data, com o JSON de sempre no campo `dados`, os arquivos em
+ * `arquivo` (até 4 imagens ou 1 PDF de até 10 páginas) e `paginas` (as páginas do PDF contadas no aparelho). A rota confere
+ * os arquivos antes de gastar qualquer coisa, reserva as páginas no saldo do dia (o mesmo da Foto do caderno;
+ * `mozart_anexo_reservar`) e devolve a reserva se o Mozart não responder. O arquivo vai ao modelo só neste pedido (e nas
+ * consultas dele); a conversa que volta para o navegador leva a marca "[foto enviada]" no lugar. Nada é guardado.
+ * A resposta de um pedido com anexo traz `paginas` ({ restam, limite, pago, teste }): o saldo do dia depois dele.
  */
 type Evento = { t: "texto"; d: string } | { t: "progresso"; frase: string };
 const querAosPoucos = (req: Request) => process.env.GESTAO_MOZART_STREAM !== "0"
@@ -114,7 +132,14 @@ async function tratar(req: Request) {
   if (!process.env.ANTHROPIC_API_KEY) { console.error("[assistente] sem ANTHROPIC_API_KEY"); return erro(503, "sem_chave", FORA_DO_AR); }
   const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token) return erro(401, "sem_login", "Entre de novo para falar com o Mozart.");
-  const corpo = (await req.json().catch(() => null)) as Corpo | null;
+  // com anexo, o pedido vem em formulário: o JSON de sempre em `dados` e os arquivos em `arquivo`
+  let corpo: Corpo | null = null;
+  let formulario: FormData | null = null;
+  if (/multipart\/form-data/i.test(req.headers.get("content-type") ?? "")) {
+    formulario = await req.formData().catch(() => null);
+    if (!formulario) return erro(400, "pedido_invalido", "Não deu para receber os arquivos. Tente de novo.");
+    try { corpo = JSON.parse(String(formulario.get("dados") ?? "")) as Corpo; } catch { corpo = null; }
+  } else corpo = (await req.json().catch(() => null)) as Corpo | null;
   if (!corpo?.petshopId || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(corpo.agora ?? "") || typeof corpo.fusoMin !== "number" || Math.abs(corpo.fusoMin) > 840) {
     return erro(400, "pedido_invalido", "Pedido incompleto.");
   }
@@ -157,6 +182,8 @@ async function tratar(req: Request) {
   // Mozart: o banco recusa a contagem ("fechado") e nenhuma chamada ao modelo é feita.
   // por que a última contagem foi recusada: "limite" (do pet shop), "geral" (todos juntos) ou "fechado" (conta só para consulta)
   let motivoDaRecusa: string | null = null;
+  // os números do limite que o banco devolveu na última contagem (pedidos por dia em vigor, o de quem paga, se é teste)
+  let numerosDoLimite: LimiteDoBanco | null = null;
   const contar = async (tipo: "pedido" | "chamada") => {
     const args = { p_petshop: c.petshop.id, p_canal: "mozart", p_tipo: tipo, p_limite: tipo === "pedido" ? LIMITE_DIA : LIMITE_CHAMADAS };
     // a contagem leva o segredo do servidor: com a trava ligada, quem chama a função direto não enche o teto de todos
@@ -165,7 +192,8 @@ async function tratar(req: Request) {
     // o banco não conhece o segredo deste servidor (chave trocada): grava a trava e tenta mais uma vez
     if (!v2.error && (v2.data as { motivo?: string } | null)?.motivo === "recusado" && ["ok", "gravou"].includes(await garantirTrava(true))) v2 = await sb.rpc("assistente_contar_v2", comSegredo);
     if (!v2.error) {
-      const d = v2.data as { ok?: boolean; motivo?: string } | null;
+      const d = v2.data as ({ ok?: boolean; motivo?: string } & LimiteDoBanco) | null;
+      if (typeof d?.limite === "number") numerosDoLimite = { limite: d.limite, pago: d.pago, teste: d.teste };
       if (d?.motivo === "recusado") { console.error("[assistente] o banco recusou o segredo do servidor: ligue a trava no painel (aba Cakto)"); await registrarErroServidor("/api/gestao/assistente", Object.assign(new Error("O banco recusou o segredo do servidor (trava do servidor): grave de novo no painel, aba Cakto"), { name: "TravaDoServidor" }), { petshop: c.petshop.id }); }
       if (!d?.ok) motivoDaRecusa = d?.motivo ?? "limite";
       return d?.ok === true;
@@ -196,6 +224,27 @@ async function tratar(req: Request) {
   // modo automático: grava na hora pelo mesmo caminho do "Pode fazer", com a ação aberta para o Desfazer
   const automatico = c.automatico ? gravarNoAutomatico({ c, liberado, anotar, reservar, liberar, sbDaAcao: (acao) => bancoDoUsuario(token, { "x-mozart-acao": acao }) }) : undefined;
 
+  // o anexo deste pedido (só em pedido novo): conferido antes de gastar qualquer cota
+  let anexos: Anexos | null = null;
+  // a reserva das páginas no saldo do dia (volta se o Mozart não responder) e o saldo depois dela
+  let reserva: string | null = null;
+  let saldo: SaldoDePaginas | null = null;
+  const devolverPaginas = async () => {
+    if (!reserva) return;
+    const r = await Promise.resolve(sb.rpc("caderno_devolver", { p_reserva: reserva })).then((x) => x, () => null);
+    reserva = null;
+    saldo = lerSaldo(r?.data) ?? (saldo && anexos ? { ...saldo, restam: saldo.restam + anexos.paginas } : saldo);
+  };
+  if (formulario && !pendentes.length) {
+    const arquivos = await arquivosDoFormulario(formulario);
+    if (!Array.isArray(arquivos)) return erro(arquivos.status, arquivos.codigo, arquivos.mensagem);
+    if (arquivos.length) {
+      const a = conferirAnexos(arquivos, Number(formulario.get("paginas") ?? 0));
+      if (!("blocos" in a)) return erro(a.status, a.codigo, a.mensagem);
+      anexos = a;
+    }
+  }
+
   if (pendentes.length) {
     // a pessoa respondeu aos cartões: grava o que foi confirmado e devolve o resultado de cada ferramenta ao modelo
     const r = await responderCartoes({ c, pendentes, liberado, decisoes: corpo.decisoes, parciais: corpo.parciais, anotar, reservar, liberar });
@@ -203,19 +252,41 @@ async function tratar(req: Request) {
     mensagens.push({ role: "user", content: r.resultados });
   } else {
     const texto = (corpo.texto ?? "").trim().slice(0, 2000);
-    if (!texto) return erro(400, "pedido_vazio", "Diga ou escreva o que você precisa.");
-    if (!(await contar("pedido"))) return motivoDaRecusa === "fechado" ? erro(403, "so_consulta", FECHADO_TEXTO) : motivoDaRecusa === "recusado" ? erro(503, "fora", FORA_DO_AR) : erro(429, "limite", textoDoLimite(motivoDaRecusa));
-    await sb.from("assistente_eventos").insert({ petshop_id: c.petshop.id, user_id: c.userId, acao: "pedido", pedido: texto });
+    if (!texto && !anexos) return erro(400, "pedido_vazio", "Diga ou escreva o que você precisa.");
+    if (anexos) {
+      // as páginas entram no saldo do dia (o mesmo da Foto do caderno) antes de chamar o modelo, numa trava só
+      const r = await sb.rpc("mozart_anexo_reservar", { p_petshop: c.petshop.id, p_paginas: anexos.paginas });
+      if (r.error) { await registrarErroServidor("/api/gestao/assistente", erroDoBanco(r.error, "mozart_anexo_reservar"), { petshop: c.petshop.id }); return erro(503, "fora", FORA_DO_AR); }
+      const d = (r.data ?? {}) as { ok?: boolean; motivo?: string; reserva?: string };
+      saldo = lerSaldo(d);
+      if (!d.ok) {
+        if (d.motivo === "limite" && saldo) return erro(429, "limite_paginas", textoDoLimiteDePaginas(saldo), { paginas: saldo });
+        if (d.motivo === "geral") return erro(429, "ocupado", PAGINAS_GERAL_TEXTO, { paginas: saldo });
+        if (d.motivo === "fechado") return erro(403, "so_consulta", FECHADO_TEXTO);
+        if (d.motivo === "email") return erro(403, "email", EMAIL_TEXTO);
+        return erro(403, "sem_acesso", "Você não faz parte deste pet shop.");
+      }
+      reserva = d.reserva ?? null;
+    }
+    if (!(await contar("pedido"))) {
+      await devolverPaginas();
+      return motivoDaRecusa === "fechado" ? erro(403, "so_consulta", FECHADO_TEXTO) : motivoDaRecusa === "recusado" ? erro(503, "fora", FORA_DO_AR) : erro(429, "limite", textoDoLimite(motivoDaRecusa, numerosDoLimite), anexos && saldo ? { paginas: saldo } : undefined);
+    }
+    await sb.from("assistente_eventos").insert({ petshop_id: c.petshop.id, user_id: c.userId, acao: "pedido", pedido: anexos ? pedidoComMarca(anexos.marca, texto) : texto });
     const dia = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"][new Date(`${c.agora.slice(0, 10)}T00:00:00Z`).getUTCDay()];
     // o que a pessoa desfez pelo botão (lido no banco): o Mozart não conta mais como feito
     const desfeitos = c.automatico || mensagens.length ? await desfeitosDaConversa(sb, c.petshop.id, mensagens) : [];
-    mensagens.push({ role: "user", content: [{ type: "text", text: texto }, { type: "text", text: `(Agora: ${dia}, ${c.agora.replace("T", " ")}, horário local do pet shop.)` },
+    mensagens.push({ role: "user", content: [
+      // o arquivo vai antes do texto, só neste pedido: a conversa que volta para o navegador leva a marca no lugar
+      ...(anexos ? [...anexos.blocos, { type: "text" as const, text: texto || SO_O_ANEXO }, { type: "text" as const, text: notaDoAnexo(anexos.imagens, anexos.paginasDoPdf) }] : [{ type: "text" as const, text: texto }]),
+      { type: "text", text: `(Agora: ${dia}, ${c.agora.replace("T", " ")}, horário local do pet shop.)` },
       ...(desfeitos.length ? [{ type: "text" as const, text: `(A pessoa tocou em Desfazer e isto foi desfeito, não vale mais: ${desfeitos.join("; ")}.)` }] : [])] });
   }
 
   // tira espaço, quebra de linha ou caractere invisível colado junto com a chave
   // guarda a conversa para a equipe Maestro Pet entender o que as pessoas pedem (não trava a resposta se falhar)
-  const pedidoDaVez = pendentes.length ? "" : (corpo.texto ?? "").trim().slice(0, 2000);
+  const textoDaVez = pendentes.length ? "" : (corpo.texto ?? "").trim().slice(0, 2000);
+  const pedidoDaVez = anexos ? pedidoComMarca(anexos.marca, textoDaVez) : textoDaVez;
   const guardarConversa = async (resposta: string) => {
     if (!pedidoDaVez) return;
     try { await sb.rpc("registrar_conversa", { p_petshop: c.petshop.id, p_canal: "mozart", p_pergunta: pedidoDaVez, p_resposta: resposta }); } catch { /* segue */ }
@@ -225,12 +296,13 @@ async function tratar(req: Request) {
   // O pedido inteiro tem prazo (PRAZO_TOTAL_MS, contado desde que a rota começou): cada chamada recebe só o tempo que sobra e,
   // depois da primeira volta, não repete. Assim a soma das voltas nunca passa do limite de 60 s da rota.
   const cliente = new Anthropic({ apiKey: (process.env.ANTHROPIC_API_KEY ?? "").replace(/[^\x21-\x7E]/g, ""), timeout: 25_000, maxRetries: 1 });
-  const comFallback = /^claude-(opus-5-5|fable-5-2)/.test(MODELO);
+  const modelo = anexos ? MODELO_ANEXO : MODELO;
+  const comFallback = /^claude-(opus-5-5|fable-5-2)/.test(modelo);
   // a pessoa fechou a conversa no meio: para de gastar com o modelo (nada é gravado sem o "Pode fazer")
   const parar = new AbortController();
 
   /** Chama o modelo, roda as voltas e devolve o status e o corpo da resposta (o mesmo nos dois jeitos de responder). */
-  const rodar = async (emitir?: (e: Evento) => void): Promise<{ status: number; corpo: Record<string, unknown> }> => {
+  const rodarAsVoltas = async (emitir?: (e: Evento) => void): Promise<{ status: number; corpo: Record<string, unknown> }> => {
     const medidas = medidasZeradas();
     let primeiro: number | null = null, sinal: number | null = null;
     const avisos = emitir && {
@@ -254,7 +326,7 @@ async function tratar(req: Request) {
         chamar: async (msgs, ao, tempo) => {
           const limites = limitesDaChamada(tempo);
           const pedido = {
-            model: MODELO,
+            model: modelo,
             max_tokens: 4000,
             output_config: { effort: "low" as const },
             ...(comFallback ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
@@ -276,8 +348,8 @@ async function tratar(req: Request) {
           return fluxo.finalMessage();
         },
       });
-      if (r.tipo === "limite") return motivoDaRecusa === "fechado" ? falha(403, "so_consulta", FECHADO_TEXTO) : motivoDaRecusa === "recusado" ? falha(503, "fora", FORA_DO_AR) : falha(429, "limite", textoDoLimite(motivoDaRecusa));
-      if (r.tipo === "recusa") { await medir("recusa"); return { status: 200, corpo: { mensagens: r.mensagens, texto: "Com isso eu não consigo ajudar. Posso cuidar da agenda, dos clientes, do caixa e do estoque.", propostas: [], parciais: [], links: [], mudou, automatico: c.automatico } }; }
+      if (r.tipo === "limite") return motivoDaRecusa === "fechado" ? falha(403, "so_consulta", FECHADO_TEXTO) : motivoDaRecusa === "recusado" ? falha(503, "fora", FORA_DO_AR) : falha(429, "limite", textoDoLimite(motivoDaRecusa, numerosDoLimite));
+      if (r.tipo === "recusa") { await medir("recusa"); return { status: 200, corpo: { mensagens: r.mensagens, texto: RECUSA_TEXTO, propostas: [], parciais: [], links: [], mudou, automatico: c.automatico } }; }
       const fez = mudou || r.mudou;
       if (r.propostas.length) {
         await Promise.all([guardarConversa([r.texto, ...r.feitos.map((f) => `[feito] ${f.resumo.titulo}`), ...r.propostas.map((p) => `[cartão] ${p.resumo.titulo}`)].filter(Boolean).join("\n")), medir("cartao")]);
@@ -287,6 +359,8 @@ async function tratar(req: Request) {
       return { status: 200, corpo: { mensagens, texto: r.texto || "Pronto.", propostas: [], parciais: [], links: r.links, feitos: r.feitos, mudou: fez, automatico: c.automatico } };
     } catch (err) {
       if (parar.signal.aborted) return { status: 499, corpo: { erro: "cancelado", mensagem: "" } };
+      // só nos testes (GESTAO_MOZART_FALSO=1): o roteiro fingiu que o modelo não respondeu
+      if (DE_TESTE && err instanceof Error && err.name === "FalhaDeTeste") return falha(502, "ia_fora", "O Mozart não respondeu agora. Tente de novo em instantes.");
       if (err instanceof Anthropic.RateLimitError) return falha(429, "ocupado", "O Mozart está com muitos pedidos agora. Tente de novo em um minuto.");
       if (err instanceof Anthropic.AuthenticationError) { console.error("[assistente] chave recusada pela Anthropic"); return falha(503, "sem_chave", FORA_DO_AR); }
       if (err instanceof Anthropic.APIError) { await registrarErroServidor("/api/gestao/assistente", Object.assign(new Error(`Anthropic respondeu ${err.status ?? "sem status"}`), { name: "ErroDaIA" }), { petshop: c.petshop.id }); return falha(502, "ia_fora", "O Mozart não respondeu agora. Tente de novo em instantes."); }
@@ -295,6 +369,23 @@ async function tratar(req: Request) {
       await registrarErroServidor("/api/gestao/assistente", err, { petshop: c.petshop.id });
       return falha(500, "falha", "Algo deu errado do nosso lado. Tente de novo em instantes.", { tipo: err instanceof Error ? err.name : typeof err });
     }
+  };
+
+  /**
+   * Com anexo: a conversa que volta leva a marca no lugar do arquivo, a resposta leva o saldo de páginas do dia e, se o
+   * Mozart não respondeu (erro, demora, recusa, limite, conversa fechada no meio), as páginas reservadas voltam.
+   */
+  const rodar = async (emitir?: (e: Evento) => void): Promise<{ status: number; corpo: Record<string, unknown> }> => {
+    if (!anexos) return rodarAsVoltas(emitir);
+    let r: { status: number; corpo: Record<string, unknown> } | null = null;
+    try {
+      r = await rodarAsVoltas(emitir);
+    } finally {
+      tirarArquivos(mensagens, anexos.marca);
+      const respondeu = r?.status === 200 && r.corpo.texto !== DEMOROU && r.corpo.texto !== RECUSA_TEXTO;
+      if (!respondeu) await devolverPaginas();
+    }
+    return { status: r.status, corpo: saldo ? { ...r.corpo, paginas: saldo } : r.corpo };
   };
 
   if (!aosPoucos) {

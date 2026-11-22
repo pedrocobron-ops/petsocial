@@ -4664,6 +4664,9 @@ isOneToOne: false
 "mozart_acao_terminar":
 { Args: { "p_acao": string,"p_ok": boolean }; Returns: boolean
                            },
+"mozart_anexo_reservar":
+{ Args: { "p_paginas": number,"p_petshop": string }; Returns: Json
+                           },
 "mozart_automatico_estado":
 { Args: { "p_petshop": string }; Returns: Json
                            },
