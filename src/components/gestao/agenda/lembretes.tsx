@@ -1,5 +1,6 @@
 "use client";
 
+import { horarioDaAgenda } from "@/lib/gestao/horario-loja";
 import { useState } from "react";
 import Link from "@/components/gestao/link-depois";
 import { Check, MessageCircle, PhoneOff } from "lucide-react";
@@ -86,13 +87,13 @@ type Grupo = { chave: string; nome: string; telefone: string | null; ficha: stri
  * marca como enviado e destaca o próximo (um por vez: o navegador não deixa abrir várias conversas de uma vez).
  */
 export default function LembretesDoDia({ dia, aoFechar, aoMudar }: { dia: string; aoFechar: () => void; aoMudar?: () => void }) {
-  const { sb, petshop } = useGestao();
+  const { sb, petshop, servicos } = useGestao();
   const registrar = useRegistrarLembrete();
   const data = deIsoDia(dia);
   const [enviados, setEnviados] = useState<Record<string, string>>({});
   // dia fechado (data marcada em Meu pet shop ou dia em que não abre): avisa antes de lembrar o tutor de um horário que talvez não vá acontecer
   useCalendario();
-  const fechado = fraseDoDiaFechado(dia) ?? (horarioDoDia(petshop.horario, data) ? null : "O pet shop não abre neste dia");
+  const fechado = fraseDoDiaFechado(dia) ?? (horarioDoDia(horarioDaAgenda(petshop.horario, servicos), data) ? null : "O pet shop não abre neste dia");
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const ags = ok(await sb.from("agendamentos").select(SELECT_AGENDAMENTO).eq("petshop_id", petshop.id)

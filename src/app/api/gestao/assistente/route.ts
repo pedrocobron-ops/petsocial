@@ -9,6 +9,7 @@ import { INSTRUCOES, contextoDoPetshop } from "@/lib/gestao/assistente/instrucoe
 import { modeloDeTeste } from "@/lib/gestao/assistente/modelo-de-teste";
 import { comRegistro, erroDoBanco, registrarErroServidor } from "@/lib/gestao/erros-servidor";
 import { garantirTrava, segredoDoServidor } from "@/lib/gestao/servidor";
+import { desfeitosDaConversa, estadoDoAutomatico, gravarNoAutomatico } from "@/lib/gestao/assistente/automatico-servidor";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -149,6 +150,8 @@ async function tratar(req: Request) {
   const doServidor = agoraNoFuso(p.data.fuso || "America/Sao_Paulo");
   const noAparelho = new Date(Date.now() + c.fusoMin * 60000).toISOString().slice(0, 16);
   if (doServidor && Math.abs(Date.parse(`${c.agora}:00Z`) - Date.parse(`${noAparelho}:00Z`)) > 15 * 60000) { c.agora = doServidor.agora; c.fusoMin = doServidor.fusoMin; }
+  // modo automático: quem diz é o banco (a escolha da pessoa e a permissão do dono), nunca o aparelho
+  c.automatico = (await estadoDoAutomatico(sb, c.petshop.id)).efetivo;
 
   // toda chamada ao modelo conta no dia do pet shop e no teto geral do dia (no banco). A conta só para consulta não usa o
   // Mozart: o banco recusa a contagem ("fechado") e nenhuma chamada ao modelo é feita.
@@ -181,20 +184,21 @@ async function tratar(req: Request) {
   const ultima = mensagens[mensagens.length - 1];
   const pendentes = ultima?.role === "assistant" && Array.isArray(ultima.content) ? ultima.content.filter((b) => b.type === "tool_use") : [];
 
+  const anotar = async (acao: string, detalhes: unknown) => { await sb.from("assistente_eventos").insert({ petshop_id: c.petshop.id, user_id: c.userId, acao, detalhes: detalhes as never }); };
+  // cada cartão grava uma vez só: a conversa volta depois de recarregar e a mesma confirmação pode chegar de novo
+  const reservar = async (uso: string) => {
+    const r = await sb.rpc("assistente_acao_reservar", { p_petshop: c.petshop.id, p_uso: uso });
+    // banco sem a função (antes da migração 20261215): segue como antes (dinheiro e estoque já têm a chave)
+    if (r.error) { if (r.error.code !== "PGRST202" && r.error.code !== "42883") console.error("[assistente] reservar ação falhou", r.error.code); return true; }
+    return r.data === true;
+  };
+  const liberar = async (uso: string) => { await sb.rpc("assistente_acao_liberar", { p_petshop: c.petshop.id, p_uso: uso }); };
+  // modo automático: grava na hora pelo mesmo caminho do "Pode fazer", com a ação aberta para o Desfazer
+  const automatico = c.automatico ? gravarNoAutomatico({ c, liberado, anotar, reservar, liberar, sbDaAcao: (acao) => bancoDoUsuario(token, { "x-mozart-acao": acao }) }) : undefined;
+
   if (pendentes.length) {
     // a pessoa respondeu aos cartões: grava o que foi confirmado e devolve o resultado de cada ferramenta ao modelo
-    const r = await responderCartoes({
-      c, pendentes, liberado, decisoes: corpo.decisoes, parciais: corpo.parciais,
-      anotar: async (acao, detalhes) => { await sb.from("assistente_eventos").insert({ petshop_id: c.petshop.id, user_id: c.userId, acao, detalhes: detalhes as never }); },
-      // cada cartão grava uma vez só: a conversa volta depois de recarregar e a mesma confirmação pode chegar de novo
-      reservar: async (uso) => {
-        const r = await sb.rpc("assistente_acao_reservar", { p_petshop: c.petshop.id, p_uso: uso });
-        // banco sem a função (antes da migração 20261215): segue como antes (dinheiro e estoque já têm a chave)
-        if (r.error) { if (r.error.code !== "PGRST202" && r.error.code !== "42883") console.error("[assistente] reservar ação falhou", r.error.code); return true; }
-        return r.data === true;
-      },
-      liberar: async (uso) => { await sb.rpc("assistente_acao_liberar", { p_petshop: c.petshop.id, p_uso: uso }); },
-    });
+    const r = await responderCartoes({ c, pendentes, liberado, decisoes: corpo.decisoes, parciais: corpo.parciais, anotar, reservar, liberar });
     mudou = r.mudou;
     mensagens.push({ role: "user", content: r.resultados });
   } else {
@@ -203,7 +207,10 @@ async function tratar(req: Request) {
     if (!(await contar("pedido"))) return motivoDaRecusa === "fechado" ? erro(403, "so_consulta", FECHADO_TEXTO) : motivoDaRecusa === "recusado" ? erro(503, "fora", FORA_DO_AR) : erro(429, "limite", textoDoLimite(motivoDaRecusa));
     await sb.from("assistente_eventos").insert({ petshop_id: c.petshop.id, user_id: c.userId, acao: "pedido", pedido: texto });
     const dia = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"][new Date(`${c.agora.slice(0, 10)}T00:00:00Z`).getUTCDay()];
-    mensagens.push({ role: "user", content: [{ type: "text", text: texto }, { type: "text", text: `(Agora: ${dia}, ${c.agora.replace("T", " ")}, horário local do pet shop.)` }] });
+    // o que a pessoa desfez pelo botão (lido no banco): o Mozart não conta mais como feito
+    const desfeitos = c.automatico || mensagens.length ? await desfeitosDaConversa(sb, c.petshop.id, mensagens) : [];
+    mensagens.push({ role: "user", content: [{ type: "text", text: texto }, { type: "text", text: `(Agora: ${dia}, ${c.agora.replace("T", " ")}, horário local do pet shop.)` },
+      ...(desfeitos.length ? [{ type: "text" as const, text: `(A pessoa tocou em Desfazer e isto foi desfeito, não vale mais: ${desfeitos.join("; ")}.)` }] : [])] });
   }
 
   // tira espaço, quebra de linha ou caractere invisível colado junto com a chave
@@ -243,7 +250,7 @@ async function tratar(req: Request) {
     const falha = async (status: number, codigo: string, mensagem: string, extra?: Record<string, unknown>) => { await medir(status === 429 && codigo === "limite" ? "limite" : "erro"); return { status, corpo: { erro: codigo, mensagem, ...extra } }; };
     try {
       const r = await voltas({
-        c, mensagens, liberado, contar: () => contar("chamada"), avisos, medidas, inicioDoPedido: inicio,
+        c, mensagens, liberado, contar: () => contar("chamada"), avisos, medidas, inicioDoPedido: inicio, automatico,
         chamar: async (msgs, ao, tempo) => {
           const limites = limitesDaChamada(tempo);
           const pedido = {
@@ -270,13 +277,14 @@ async function tratar(req: Request) {
         },
       });
       if (r.tipo === "limite") return motivoDaRecusa === "fechado" ? falha(403, "so_consulta", FECHADO_TEXTO) : motivoDaRecusa === "recusado" ? falha(503, "fora", FORA_DO_AR) : falha(429, "limite", textoDoLimite(motivoDaRecusa));
-      if (r.tipo === "recusa") { await medir("recusa"); return { status: 200, corpo: { mensagens: r.mensagens, texto: "Com isso eu não consigo ajudar. Posso cuidar da agenda, dos clientes, do caixa e do estoque.", propostas: [], parciais: [], links: [], mudou } }; }
+      if (r.tipo === "recusa") { await medir("recusa"); return { status: 200, corpo: { mensagens: r.mensagens, texto: "Com isso eu não consigo ajudar. Posso cuidar da agenda, dos clientes, do caixa e do estoque.", propostas: [], parciais: [], links: [], mudou, automatico: c.automatico } }; }
+      const fez = mudou || r.mudou;
       if (r.propostas.length) {
-        await Promise.all([guardarConversa([r.texto, ...r.propostas.map((p) => `[cartão] ${p.resumo.titulo}`)].filter(Boolean).join("\n")), medir("cartao")]);
-        return { status: 200, corpo: { mensagens, texto: r.texto, propostas: r.propostas, parciais: r.parciais, links: r.links, mudou } };
+        await Promise.all([guardarConversa([r.texto, ...r.feitos.map((f) => `[feito] ${f.resumo.titulo}`), ...r.propostas.map((p) => `[cartão] ${p.resumo.titulo}`)].filter(Boolean).join("\n")), medir("cartao")]);
+        return { status: 200, corpo: { mensagens, texto: r.texto, propostas: r.propostas, parciais: r.parciais, links: r.links, feitos: r.feitos, mudou: fez, automatico: c.automatico } };
       }
-      await Promise.all([guardarConversa(r.texto || "Pronto."), medir(r.cortou ? "demorou" : "ok")]);
-      return { status: 200, corpo: { mensagens, texto: r.texto || "Pronto.", propostas: [], parciais: [], links: r.links, mudou } };
+      await Promise.all([guardarConversa([r.texto || "Pronto.", ...r.feitos.map((f) => `[${f.ok ? "feito" : "não feito"}] ${f.resumo.titulo}`)].join("\n")), medir(r.cortou ? "demorou" : "ok")]);
+      return { status: 200, corpo: { mensagens, texto: r.texto || "Pronto.", propostas: [], parciais: [], links: r.links, feitos: r.feitos, mudou: fez, automatico: c.automatico } };
     } catch (err) {
       if (parar.signal.aborted) return { status: 499, corpo: { erro: "cancelado", mensagem: "" } };
       if (err instanceof Anthropic.RateLimitError) return falha(429, "ocupado", "O Mozart está com muitos pedidos agora. Tente de novo em um minuto.");

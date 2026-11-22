@@ -5,12 +5,15 @@ import type { AvisosDaChamada, Msg, RespostaDoModelo } from "./conversa";
  * Serve para provar pela rota de verdade o que não depende do modelo: o texto chegando aos poucos (palavra por palavra),
  * o markdown na bolha, o cartão que volta depois de recarregar e que grava uma vez só.
  * - pedido com "bloqueia": cartão de bloquear o almoço de amanhã (12h às 13h); depois do "Pode fazer", "Prontinho…".
+ * - pedido com "bloqueia o começo e o fim": dois cartões de bloqueio de amanhã (7h às 8h e 19h às 20h) na mesma resposta.
  * - pedido com "markdown": resposta com negrito e lista.
  * - pedido com "tabela de preços": os quatro serviços do dono numa resposta só (banho P e M R$ 100, G e GG R$ 130; corte de unhas
  *   R$ 30 qualquer porte; escovação R$ 20; hidratação P/M R$ 60, G/GG R$ 80): muda o que existe e cadastra o que falta, com os
  *   ids tirados do contexto do pet shop (`sistema`). Os cartões aparecem juntos, com Confirmar tudo.
  * - pedido com "vendi 2 mordedores": cartão de vender 2 "Mordedor" no Pix (vender_produto, o produto pelo nome); com "vendi 10
  *   pacotes de ração": a ração não está no Estoque, o mesmo cartão cadastra (R$ 100 o pacote) e vende 10 em dinheiro.
+ * - pedido "domingo a creche e o hotel abrem das 8h às 18h": dois cartões de alterar_funcionamento (alvo creche e alvo hotel),
+ *   juntos, com Confirmar tudo.
  * - qualquer outro: uma frase escrita devagar, palavra por palavra (cerca de 60 ms entre as palavras).
  */
 const espera = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
@@ -73,6 +76,30 @@ export async function modeloDeTeste(msgs: Msg[], ao: AvisosDaChamada, sistema = 
     ao.ferramenta("vender_produto");
     return {
       content: [{ type: "text", text: t, citations: null }, { type: "tool_use", id: `toolu_teste${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`, name: "vender_produto", input: venda }],
+      stop_reason: "tool_use",
+    } as unknown as RespostaDoModelo;
+  }
+  if (/domingo a creche e o hotel abrem/.test(texto)) {
+    const t = "Combinado: no domingo a creche e o hotel abrem das 8h às 18h, e o pet shop continua fechado. Confere nos cartões.";
+    await escrever(t, ao, 10);
+    const usos = (["creche", "hotel"] as const).map((alvo, i) => {
+      ao.ferramenta("alterar_funcionamento");
+      return { type: "tool_use", id: `toolu_teste${Date.now().toString(36)}h${i}${Math.random().toString(36).slice(2, 6)}`, name: "alterar_funcionamento",
+        input: { alvo, dias: [{ dia: "domingo", abre: "08:00", fecha: "18:00" }] } };
+    });
+    return { content: [{ type: "text", text: t, citations: null }, ...usos], stop_reason: "tool_use" } as unknown as RespostaDoModelo;
+  }
+  if (/bloqueia (o )?come[cç]o e (o )?fim/.test(texto)) {
+    // dois cartões numa resposta só (no automático, os dois são feitos em ordem)
+    const t = "Vou bloquear o começo e o fim de amanhã.";
+    await escrever(t, ao, 10);
+    const amanha = somaDia(hoje ?? new Date().toISOString().slice(0, 10), 1);
+    const id = () => `toolu_teste${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    ao.ferramenta("bloquear_horario");
+    return {
+      content: [{ type: "text", text: t, citations: null },
+        { type: "tool_use", id: id(), name: "bloquear_horario", input: { dia: amanha, de: "07:00", ate: "08:00", motivo: "Começo" } },
+        { type: "tool_use", id: id(), name: "bloquear_horario", input: { dia: amanha, de: "19:00", ate: "20:00", motivo: "Fim" } }],
       stop_reason: "tool_use",
     } as unknown as RespostaDoModelo;
   }

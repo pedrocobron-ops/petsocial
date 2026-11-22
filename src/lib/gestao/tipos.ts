@@ -3,7 +3,8 @@ import { COLS_AGENDAMENTO } from "./reservado";
 
 type T = Database["public"]["Tables"];
 export type Petshop = T["petshops"]["Row"];
-export type Profissional = T["profissionais"]["Row"];
+/** A pessoa da equipe como as telas leem. O modo automático do Mozart não vem na linha: sai por `mozart_automatico_estado`. */
+export type Profissional = Omit<T["profissionais"]["Row"], "mozart_automatico">;
 export type Cliente = T["clientes"]["Row"];
 export type Pet = T["pets"]["Row"];
 /** `preco_varia`: o preço muda com o porte (vem do banco mesmo para quem não vê os preços, que chegam vazios). */

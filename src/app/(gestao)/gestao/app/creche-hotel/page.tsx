@@ -1,5 +1,6 @@
 "use client";
 
+import { areaTemHorario, horarioDaArea, horarioDaCreche } from "@/lib/gestao/horario-loja";
 import AceiteDoLink from "@/components/gestao/agenda/aceite-do-link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "@/components/gestao/link-depois";
@@ -53,7 +54,7 @@ import CuidadosDeAgora from "@/components/gestao/hotel/cuidados-de-agora";
 import { principalDe, usaModulo } from "@/lib/gestao/modulos";
 import type { Banco } from "@/lib/gestao/supabase";
 import type { Estadia, Petshop } from "@/lib/gestao/tipos";
-import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, inicioDoDia, isoDia, juntaDiaHora, nomeMes, somaDias, centavos } from "@/lib/gestao/util";
+import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, horarioDoDia, inicioDoDia, isoDia, juntaDiaHora, nomeMes, somaDias, centavos } from "@/lib/gestao/util";
 import { conflitoDoPet, type Periodo } from "@/lib/gestao/conflito-estadia";
 import "./creche-hotel.css";
 import "@/components/gestao/hotel/hotel.css";
@@ -523,7 +524,7 @@ export default function CrecheHotel() {
   const atrasadas = naCasa.filter((e) => e.saida_prevista && new Date(e.saida_prevista) < agora);
   const crecheNaCasa = naCasa.filter((e) => e.tipo === "creche");
   // vagas de hoje, por tipo, pela regra de estadiaOcupa (no hotel, quem sai hoje já não ocupa a noite de hoje)
-  const vagasHoje = TIPOS.map((t) => ({ ...t, total: vagasDoTipo(petshop, t.id), ocupadas: ocupadasNoDia(t.id, abertas, null, hojeIso, agora, mens ?? null, petshop.horario) }))
+  const vagasHoje = TIPOS.map((t) => ({ ...t, total: vagasDoTipo(petshop, t.id), ocupadas: ocupadasNoDia(t.id, abertas, null, hojeIso, agora, mens ?? null, horarioDaCreche(petshop)) }))
     .filter((v) => v.total != null);
   const noHotel = naCasa.filter((e) => e.tipo === "hotel").length;
   // a reserva de hoje que passou da hora sem check-in aparece como atrasada (não como "próxima")
@@ -560,7 +561,7 @@ export default function CrecheHotel() {
   };
   // leva e traz de hoje (buscar quem entra hoje, levar quem sai hoje): o botão abre a lista do dia
   // táxi dos mensalistas de hoje: quem tem táxi no plano e é esperado (ou já veio), sem falta
-  const taxiHoje = mens ? montarChamada(mens.planos.filter((p) => p.taxi), hojeIso, mens.presencas, mens.faltas, petshop.horario).filter((l) => l.estado !== "faltou").length : 0;
+  const taxiHoje = mens ? montarChamada(mens.planos.filter((p) => p.taxi), hojeIso, mens.presencas, mens.faltas, horarioDaCreche(petshop)).filter((l) => l.estado !== "faltou").length : 0;
   const levaTrazHoje = abertas.filter((e) => estadiaTemViagemNoDia(e, hojeIso)).length + taxiHoje;
   const botaoMensagens = (e: EstadiaCompleta) => e.pets ? <button className="g-btn zap p" onClick={() => setMensagens(e)}><MessageCircle /> Mensagens</button> : null;
 
@@ -1080,7 +1081,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
   const vagas = vagasDoTipo(petshop, tipo);
   const diasDoPeriodo = periodoForm ? diasOcupados(periodoForm, new Date()) : [];
   const maisCheio = vagas != null && diasDoPeriodo.length
-    ? diasDoPeriodo.map((d) => ({ d, n: ocupadasNoDia(tipo, abertas, editar?.id ?? null, d, new Date(), mens, petshop.horario) })).reduce((m, x) => (x.n > m.n ? x : m)) : null;
+    ? diasDoPeriodo.map((d) => ({ d, n: ocupadasNoDia(tipo, abertas, editar?.id ?? null, d, new Date(), mens, horarioDaCreche(petshop)) })).reduce((m, x) => (x.n > m.n ? x : m)) : null;
   /** Quantos hóspedes a acomodação tem no dia mais cheio do período (sem contar esta estadia). */
   const noQuarto = (id: string) => Math.max(0, ...diasDoPeriodo.map((d) => abertas.filter((e) => e.id !== editar?.id && e.acomodacao === id && ocupaNoDia(e, d, hojeIso)).length));
 
@@ -1088,7 +1089,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
   // num dia que já é do plano, não há o que reservar
   const planoDoPet = !editar && tipo === "creche" && pet && dia ? mens?.planos.find((p) => p.pet_id === pet.id && planoVale(p, jaAqui ? hojeIso : dia)) : undefined;
   const umDiaSo = !saidaDia || saidaDia === dia;
-  const diaDoPlano = Boolean(planoDoPet && !jaAqui && umDiaSo && esperadoNoDia(planoDoPet, dia, petshop.horario));
+  const diaDoPlano = Boolean(planoDoPet && !jaAqui && umDiaSo && esperadoNoDia(planoDoPet, dia, horarioDaCreche(petshop)));
   const reservaExtra = Boolean(planoDoPet && !jaAqui && umDiaSo && dia >= hojeIso && !diaDoPlano);
   // o valor do dia extra só aparece quando o valor do plano veio (quem não cuida do financeiro não recebe o preço próprio
   // do plano, e a diária padrão não é o que vai para a mensalidade)
@@ -1162,7 +1163,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
     }))) return;
     // casa cheia em algum dia do período
     if (vagas != null) {
-      const tomadas = new Map(diasOcupados(novo, agora).map((d) => [d, ocupadasNoDia(tipo, abertas, editar?.id ?? null, d, agora, mens, petshop.horario)]));
+      const tomadas = new Map(diasOcupados(novo, agora).map((d) => [d, ocupadasNoDia(tipo, abertas, editar?.id ?? null, d, agora, mens, horarioDaCreche(petshop))]));
       const cheios = [...tomadas.keys()].filter((d) => (tomadas.get(d) ?? 0) >= vagas);
       if (cheios.length && !(await confirmar({
         titulo: `Casa cheia em ${dataCurta(cheios[0])} (${Math.max(vagas, tomadas.get(cheios[0]) ?? 0)} de ${vagas})`,
@@ -1272,9 +1273,21 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
   const diaDaEntrada = entradaForm && !Number.isNaN(entradaForm.getTime()) ? isoDia(entradaForm) : null;
   const diaDaSaida = saidaForm && !Number.isNaN(saidaForm.getTime()) ? isoDia(saidaForm) : null;
   const diasFechados = (tipo === "creche" ? (diasDoPeriodo.length ? diasDoPeriodo : diaDaEntrada ? [diaDaEntrada] : []) : [diaDaEntrada, diaDaSaida].filter((d): d is string => Boolean(d)))
-    // na creche também conta o dia da semana em que vocês não abrem (sábado, domingo), pelo horário de Meu pet shop
-    .filter((d, i, l) => (diaFechado(d) || (tipo === "creche" && !abreNoDia(petshop.horario, d))) && l.indexOf(d) === i);
-  const fraseDoFechado = (d: string) => fraseDoDiaFechado(d) ?? `Pelo horário de Meu pet shop, vocês não abrem ${["no domingo", "na segunda", "na terça", "na quarta", "na quinta", "na sexta", "no sábado"][deIsoDia(d).getDay()]}`;
+    // também conta o dia da semana em que a creche ou o hotel não abre (sábado, domingo), pelo horário de Meu pet shop
+    // (o da creche ou o do hotel, quando tem; senão, o do pet shop)
+    .filter((d, i, l) => (diaFechado(d) || !abreNoDia(horarioDaArea(petshop, tipo), d)) && l.indexOf(d) === i);
+  const proprio = areaTemHorario(petshop, tipo);
+  const quemNaoAbre = proprio ? (tipo === "creche" ? "Pelo horário da creche, ela não abre" : "Pelo horário do hotel, ele não recebe nem entrega pets") : "Pelo horário de Meu pet shop, vocês não abrem";
+  const fraseDoFechado = (d: string) => fraseDoDiaFechado(d) ?? `${quemNaoAbre} ${["no domingo", "na segunda", "na terça", "na quarta", "na quinta", "na sexta", "no sábado"][deIsoDia(d).getDay()]}`;
+  // a hora de chegar ou de buscar fora da janela do dia (creche e hotel: a do horário deles; senão, a do pet shop)
+  const foraDaJanela = ([[diaDaEntrada, escolheEntrada ? hhmm : "", "A chegada"], [diaDaSaida, saidaDia ? saidaHora : "", "A saída"]] as const)
+    .map(([d, h, quem]) => {
+      if (!d || !h || diasFechados.includes(d)) return null;
+      const j = horarioDoDia(horarioDaArea(petshop, tipo), deIsoDia(d));
+      // buscar no hotel depois de fechar pode ter taxa (Meu pet shop, Hotel): não é aviso aqui
+      const depois = !!j && h > j.fecha.slice(0, 5) && !(tipo === "hotel" && quem === "A saída");
+      return j && (h < j.abre.slice(0, 5) || depois) ? `${quem} (${h}) fica fora do horário ${tipo === "creche" ? "da creche" : "do hotel"} nesse dia: das ${j.abre.slice(0, 5)} às ${j.fecha.slice(0, 5)}.` : null;
+    }).filter((x): x is string => Boolean(x));
   const nivel = maisCheio && vagas != null ? nivelDeOcupacao(maisCheio.n, vagas) : null;
 
   return (
@@ -1329,6 +1342,12 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
             <span>{diasFechados.length === 1
               ? <><b>{fraseDoFechado(diasFechados[0])} ({dataCurta(diasFechados[0])}).</b> {tipo === "creche" ? "A creche não abre nesse dia." : diasFechados[0] === diaDaEntrada ? "A chegada cai num dia em que vocês não abrem." : "A saída cai num dia em que vocês não abrem."}</>
               : <><b>{diasFechados.length} dias fechados no período</b> ({diasFechados.slice(0, 5).map((d) => dataCurta(d)).join(", ")}{diasFechados.length > 5 ? "…" : ""}).</>} Dá para salvar assim mesmo.</span>
+          </p>
+        )}
+        {foraDaJanela.length > 0 && (
+          <p className="g-ht-fechado" role="status" data-teste="fora-da-janela">
+            <CalendarOff aria-hidden />
+            <span>{foraDaJanela.join(" ")} Dá para salvar assim mesmo.</span>
           </p>
         )}
         {maisCheio && vagas != null && (

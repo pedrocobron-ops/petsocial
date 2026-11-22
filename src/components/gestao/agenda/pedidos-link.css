@@ -66,3 +66,11 @@
 .g-pl-aceite details summary { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; min-height: 28px; }
 .g-pl-aceite details div { margin-top: 4px; padding: 10px 12px; border-radius: 12px; background: var(--g-carta-2); white-space: pre-line; overflow-wrap: anywhere; color: var(--g-tinta); }
 .g-pl-andando { margin: 0; padding: 8px 12px; border-radius: var(--g-raio-p, 12px); background: var(--t-manteiga, #fbf0c9); color: #5b4708; font-size: .875rem; line-height: 1.35; }
+
+/* o aceite criou um pet novo ("pet novo"), com o atalho "Era outro pet?"; e a pergunta do nome parecido */
+.g-pl-nome .g-pl-petnovo { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 6px; }
+.g-pl-petnovo > span { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.g-pl-petnovo .g-link { font-size: .875rem; }
+.g-pl-sim { flex-wrap: wrap; gap: 8px; }
+.g-pl-trocar { width: 100%; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.g-pl-trocar .g-cresce > span { display: block; }

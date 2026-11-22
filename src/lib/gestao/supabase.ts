@@ -69,10 +69,13 @@ export function banco(): Banco {
   return cliente;
 }
 
-/** Cliente do servidor que age em nome de quem está logado: as regras do banco valem igual. */
-export function bancoDoUsuario(token: string): Banco {
+/**
+ * Cliente do servidor que age em nome de quem está logado: as regras do banco valem igual. `extras`: cabeçalhos a mais
+ * (o Mozart no modo automático manda `x-mozart-acao`, para o banco anotar o que a ação gravou e dar para desfazer).
+ */
+export function bancoDoUsuario(token: string, extras?: Record<string, string>): Banco {
   return createClient<Database>(SUPABASE_URL, SUPABASE_CHAVE, {
     auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: `Bearer ${token}` } },
+    global: { headers: { ...extras, Authorization: `Bearer ${token}` } },
   });
 }

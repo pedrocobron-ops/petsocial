@@ -71,3 +71,10 @@ section.g-card.g-pilha > .g-mp-t { margin-bottom: 0; }
 /* serviços com a mesma cor: o texto ocupa a linha e o botão desce no celular */
 .g-aviso.g-mp-cores .g-cresce { flex: 1 1 260px; }
 .g-aviso.g-mp-cores .g-btn { margin-left: 0; }
+
+/* o horário da creche e do hotel, embaixo do horário do pet shop; e o "horário próprio" do serviço */
+.g-mp-area { padding-top: 14px; border-top: 1px dashed var(--g-linha); }
+.g-mp-area h3 { margin: 0; font-size: 1rem; font-weight: 600; }
+.g-mp-area p { margin: 2px 0 0; }
+.g-seg.g-mp-proprio { display: flex; max-width: 360px; }
+.g-seg.g-mp-proprio button { flex: 1 1 0; min-width: 0; min-height: 44px; padding: 0 10px; }

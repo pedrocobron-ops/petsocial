@@ -175,7 +175,7 @@ async function rodarFerramenta(sb: Banco, codigo: string, d: DadosDoLink, nome: 
   if (nome === FERRAMENTA_HORARIOS) {
     const e = entradaHorarios(input, d);
     if (!e.ok) return e.erro;
-    const { data, error } = await sb.rpc("link_horarios", { p_codigo: codigo, p_servico: e.servicoId, p_dia: e.dia, p_pets: e.pets });
+    const { data, error } = await sb.rpc("link_horarios", { p_codigo: codigo, p_servico: e.servicoId, p_dia: e.dia, p_pets: e.pets, ...(e.extras.length ? { p_extras: e.extras } : {}) });
     if (error) return "Não deu para ver os horários agora.";
     const lista = ((data ?? []) as string[]).map((h) => String(h).slice(0, 5));
     return lista.length ? `Horários livres em ${e.dia}: ${lista.join(", ")}. O pedido ainda precisa ser confirmado pelo pet shop.` : `Sem horário livre em ${e.dia}.`;
