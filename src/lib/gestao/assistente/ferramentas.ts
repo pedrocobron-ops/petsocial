@@ -67,6 +67,8 @@ export type Contexto = {
   chave?: string;
   /** Dias fechados e feriados dos próximos 14 dias (a rota lê de `dias_especiais`; vai no contexto do modelo). */
   diasEspeciais?: { dia: string; nome: string | null; fechado: boolean; feriado: boolean }[];
+  /** Modo automático valendo para esta pessoa (o banco confirmou): o Mozart grava sem cartão e fala no passado. */
+  automatico?: boolean;
 };
 
 export type Resumo = { titulo: string; linhas: [string, string][] };
@@ -87,7 +89,7 @@ export function quandoLocal(local: string) {
 const diaSemanaLocal = (dia: string) => new Date(`${dia}T00:00:00Z`).getUTCDay();
 const somaDiasLocal = (dia: string, n: number) => new Date(Date.parse(`${dia}T00:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
 
-class ErroDeUso extends Error {}
+export class ErroDeUso extends Error {}
 function exigir(cond: unknown, msg: string): asserts cond { if (!cond) throw new ErroDeUso(msg); }
 function ok<T>(r: { data: T; error: { message: string } | null }): NonNullable<T> {
   if (r.error) throw new Error(r.error.message);

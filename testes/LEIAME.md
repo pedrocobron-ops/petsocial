@@ -20,8 +20,9 @@ ANTHROPIC_API_KEY=sk-ant-chave-falsa GESTAO_LINK_IA_FALSO=1 GESTAO_ERRO_TESTE=1 
 #    "bloqueia…" traz o cartão de bloquear o almoço de amanhã; "markdown" responde com negrito e lista; o resto, uma frase
 #    escrita palavra por palavra; "tabela de preços" traz os quatro cartões de serviço juntos (Confirmar tudo). Precisa dele:
 #    banco/mozart-rota.js, telas/mozart-consertos.js, telas/mozart-cadastros.js e telas/operacao-estoque.js ("vendi 2 mordedores",
-#    "vendi 10 pacotes de ração": cartão de vender_produto) e telas/horario-servico.js ("domingo a creche e o hotel abrem das
-#    8h às 18h": dois cartões de alterar_funcionamento, alvo creche e alvo hotel).
+#    "vendi 10 pacotes de ração": cartão de vender_produto), telas/horario-servico.js ("domingo a creche e o hotel abrem das
+#    8h às 18h": dois cartões de alterar_funcionamento, alvo creche e alvo hotel). "bloqueia o começo e o fim": dois bloqueios
+#    de amanhã numa resposta (telas/mozart-automatico.js: no modo automático, os dois são feitos em ordem).
 npx next build
 ANTHROPIC_API_KEY=sk-ant-chave-falsa GESTAO_LINK_IA_FALSO=1 GESTAO_ERRO_TESTE=1 GESTAO_BOLETIM_FALSO=1 npx next start -p 3214
 
@@ -93,6 +94,13 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   outro check-in e reserva para hoje continuam recusados; hotel sem saída prevista continua cruzando.
 - `estreante-m.js`: rodada 8 (estreante): valor no cartão do pedido pelo link (`precoDoPedido`), a anotação do Mozart na ficha do pet (`anotacaoDoPet`), o modo simples (`foraNoModoSimples`) e "Faltam N coisas para começar".
 - `venda-produto.js`: venda de produto que bate com o Estoque, sem banco: a entrada escrita à mão em Venda de produtos (`venda-solta.ts`: "Venda de 2 mordedores" acha "Mordedor de plástico") e o aviso; `vender_produto` do Mozart (quem recebe a ferramenta, o cartão com valor, total, forma, saldo e o produto novo), a recusa do `lancar_dinheiro` em Venda de produtos e as instruções.
+- `mozart-automatico.js`: o modo automático do Mozart, sem banco (`assistente/automatico.ts`, `automatico-servidor.ts`): o texto exato
+  do aviso ("Ligar o modo automático?", Entendi, "Ligar o automático", "Agora não") e a versão do aceite; o dono sempre pode, a equipe
+  só com a permissão; estado estranho vale como desligado; Desfazer em 24 horas, só quem pediu ou o dono, uma vez só, e a frase curta
+  de cada erro (caixa fechado, acesso, rede); as instruções no passado, com Desfazer e ainda perguntando o que falta; `voltas` no
+  automático grava sem cartão e a conversa segue; `gravarNoAutomatico` abre o registro do Desfazer, grava pelo cliente com o
+  cabeçalho `x-mozart-acao` e fecha a ação; leva com falha para no primeiro erro (PAROU_ANTES) e só a feita tem Desfazer; banco que
+  recusa abrir a ação não grava nada.
 - `mozart-cadastros.js`: as ferramentas de cadastro do Mozart (`assistente/ferramenta-cadastros.ts`), sem banco: serviços, horário e
   diárias só do dono (nem o gerente), produto só com Estoque, pacote só com Pacotes, tutor com Clientes, Agenda ou Creche e hotel;
   preço único ou por porte, aniversário, horário de funcionamento e almoço; vários cartões juntos gravam em ordem e o primeiro que
@@ -304,6 +312,19 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   (60/min) e geral (1000/h, posto no limite durante o teste e devolvido); sem internet só conta; resolvido some e volta numa versão
   nova; rota do servidor que quebra vira registro com origem "servidor". Precisa do servidor com `GESTAO_ERRO_TESTE=1`.
 - `mozart-link-v2.js` (servidor com GESTAO_LINK_IA_FALSO=1 e GESTAO_MOZART_FALSO=1): `link_taxi` (táxi pet do link, sem valor com o preço escondido) e o "Tirar dúvida" respondendo o plano de 3x e o táxi; `ver_sinais` com o sinal que virou crédito (219,60 − 54 − 89,70 = 75,90 com o pet shop); táxi do mensalista em `ver_planos_creche` e `ver_hospedes` (preço só para quem recebe); dia fechado em creche_por_dia; `ver_maquininha` igual a `taxas_do_periodo`; `ver_descontos`; "Pensando…" como primeiro evento da rota.
+- `mozart-automatico.js` (migração 20261244; a parte da rota precisa do servidor com GESTAO_MOZART_FALSO=1, sem ele vira problema
+  conhecido): desligado para todos no começo; a equipe não liga sem o dono permitir (`mozart.automatico_equipe`) nem sem o
+  "Entendi"; ninguém lê nem muda `profissionais.mozart_automatico` pela API; o dono permite, a Rita liga e o aceite fica em
+  `mozart_automatico_aceites` (cada um lê o seu; o dono lê todos); o dono tira a permissão e o dela para de valer; com o
+  automático sem valer, `mozart_acao_comecar` recusa, a coluna ligada à mão sem aceite não vale e a rota manda o cartão mesmo com
+  `automatico: true` no pedido. Cada ação grava sem cartão e o Desfazer volta: horário desmarcado, preço, funcionamento,
+  diárias e tutor de volta, serviço/produto/pet+tutor criados apagados, bloqueio tirado e posto de volta, desmarcado que volta
+  (horário livre) e que não volta (ocupado), reserva da creche e check-in cancelados, saúde apagada, caixa aberto apagado,
+  recebimento, conta do cliente e conta a pagar apagados, conta paga volta para A pagar, entrada de estoque com saída contrária
+  ("Desfeito pelo Mozart") e venda desfeita com o estoque de volta. Leva de três com falha no meio (PAROU_ANTES) e de duas em
+  ordem. Rita não desfaz o do Tito (nem chamando `mozart_desfazer` direto; `mozart_desfazer_ler` e `mozart_acoes_linhas` fechados);
+  o dono desfaz; duas vezes, "Isso já foi desfeito."; recebimento de caixa fechado não sai (explica, também para o dono); mudou
+  depois, explica; passou de 24 horas, explica; desligar sempre vale e fica registrado.
 - `mozart-consertos.js`: com o banco de verdade e modelo de mentira: "coloca a Mel na creche amanhã" vira reserva da creche (e a
   confirmação repetida grava uma vez só, pela função `assistente_acao_reservar`, migração 20261215), mensalista no dia do plano não
   reserva e em outro dia vira dia extra, hotel com entrada e saída, `ver_hospedes` com a creche dia a dia (mensalista de todo dia),
@@ -700,6 +721,11 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   8 s de silêncio e em 30 s (`page.clock`); navegador sem ditado: sem botão, escrever continua igual. Capturas em `testes/saida/mozart-voz-*`.
 - `mozart-v2.js` (servidor com GESTAO_MOZART_FALSO=1): "Pensando…" logo depois de mandar; recarregar no meio da resposta traz a parte que chegou marcada "Resposta interrompida" e "Perguntar de novo" traz a resposta inteira (390 e 1366).
 - `operacao-estoque.js` (servidor com GESTAO_MOZART_FALSO=1), em 390 e 1366: o Mozart vende 2 mordedores (cartão, um lançamento ligado à saída, o Estoque conta a venda) e cadastra e vende a ração; no Caixa, Entrada em Venda de produtos escrita à mão mostra o aviso ("Mordedor de plástico está no Estoque" / "Este item não está no Estoque"), sem travar o Lançar, e "Escolher o produto do Estoque" abre a Venda no balcão; Creche e hotel: a reserva de hoje que passou da hora aparece "atrasada · não chegou", primeiro, com o Check-in, e o número Reservas diz "1 atrasada · não chegou"; Primeiros passos: com 1 de N serviços com preço, o passo dos preços não fica feito e diz "1 de N com preço".
+- `mozart-automatico.js` (servidor com GESTAO_MOZART_FALSO=1), em 390 e 1366: ajustes do Mozart, Modo automático: o aviso com o
+  texto do dono, "Ligar o automático" travado até marcar Entendi, o selo laranja Automático no topo (cabe no painel) e o aceite no
+  banco; "bloqueia o almoço de amanhã" grava sem cartão, com o cartão Feito e o Desfazer (que tira o bloqueio do banco); "bloqueia o
+  começo e o fim de amanhã" grava os dois em ordem, sem Confirmar tudo; o selo abre os ajustes e desmarcar desliga. Sem rolagem
+  para o lado e sem erro na página.
 - `mozart-cadastros.js` (servidor com GESTAO_MOZART_FALSO=1): a tabela de preços em quatro cartões com "Confirmar tudo (4)" (cabe
   no painel em 390 e 1366), um toque grava os quatro e os preços ficam no banco.
 - `mozart-consertos.js` (servidor com GESTAO_MOZART_FALSO=1): negrito e lista na bolha; recarregar traz a conversa e o cartão

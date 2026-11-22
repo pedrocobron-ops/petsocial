@@ -5,6 +5,7 @@ import type { AvisosDaChamada, Msg, RespostaDoModelo } from "./conversa";
  * Serve para provar pela rota de verdade o que não depende do modelo: o texto chegando aos poucos (palavra por palavra),
  * o markdown na bolha, o cartão que volta depois de recarregar e que grava uma vez só.
  * - pedido com "bloqueia": cartão de bloquear o almoço de amanhã (12h às 13h); depois do "Pode fazer", "Prontinho…".
+ * - pedido com "bloqueia o começo e o fim": dois cartões de bloqueio de amanhã (7h às 8h e 19h às 20h) na mesma resposta.
  * - pedido com "markdown": resposta com negrito e lista.
  * - pedido com "tabela de preços": os quatro serviços do dono numa resposta só (banho P e M R$ 100, G e GG R$ 130; corte de unhas
  *   R$ 30 qualquer porte; escovação R$ 20; hidratação P/M R$ 60, G/GG R$ 80): muda o que existe e cadastra o que falta, com os
@@ -87,6 +88,20 @@ export async function modeloDeTeste(msgs: Msg[], ao: AvisosDaChamada, sistema = 
         input: { alvo, dias: [{ dia: "domingo", abre: "08:00", fecha: "18:00" }] } };
     });
     return { content: [{ type: "text", text: t, citations: null }, ...usos], stop_reason: "tool_use" } as unknown as RespostaDoModelo;
+  }
+  if (/bloqueia (o )?come[cç]o e (o )?fim/.test(texto)) {
+    // dois cartões numa resposta só (no automático, os dois são feitos em ordem)
+    const t = "Vou bloquear o começo e o fim de amanhã.";
+    await escrever(t, ao, 10);
+    const amanha = somaDia(hoje ?? new Date().toISOString().slice(0, 10), 1);
+    const id = () => `toolu_teste${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    ao.ferramenta("bloquear_horario");
+    return {
+      content: [{ type: "text", text: t, citations: null },
+        { type: "tool_use", id: id(), name: "bloquear_horario", input: { dia: amanha, de: "07:00", ate: "08:00", motivo: "Começo" } },
+        { type: "tool_use", id: id(), name: "bloquear_horario", input: { dia: amanha, de: "19:00", ate: "20:00", motivo: "Fim" } }],
+      stop_reason: "tool_use",
+    } as unknown as RespostaDoModelo;
   }
   if (/bloqueia/.test(texto)) {
     const t = "Vou bloquear o almoço de amanhã. Confere no cartão e clica em Pode fazer.";
