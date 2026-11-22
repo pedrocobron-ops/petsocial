@@ -34,6 +34,8 @@ const Assistente = dynamic(carregarAssistente, { ssr: false });
 const Ajuda = dynamic(() => import("./ajuda"), { ssr: false });
 const AjudaDaTela = dynamic(() => import("./manual/ajuda-da-tela"), { ssr: false });
 const GuiaInicial = dynamic(() => import("./guia-inicial"), { ssr: false });
+// Resumo do dia: a folha da primeira entrada do dia (e do botão da tela Hoje); vem à parte, depois que a tela abriu
+const ResumoDoDia = dynamic(() => import("./resumo-do-dia"), { ssr: false });
 const PersonalizarMenu = dynamic(() => import("./personalizar-menu"), { ssr: false });
 
 type Item = { href: string; rotulo: string; icone: React.ComponentType; tom: Tom; so?: "financeiro" | "dono" };
@@ -441,6 +443,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
 
       {personalizar && souDono && <PersonalizarMenu aoFechar={() => setPersonalizar(false)} />}
       {guia !== "fechado" && <GuiaInicial abrirAgora={guia === "botao"} />}
+      <ResumoDoDia />
       {ajuda && <Ajuda aoFechar={() => setAjuda(false)} />}
       {assistente.aberta && <Assistente pedidoInicial={assistente.pedido} aoFechar={() => setAssistente({ aberta: false, pedido: "" })} />}
     </div>

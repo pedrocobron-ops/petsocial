@@ -128,7 +128,7 @@ const VOLTAS_DAS_CONTAS = 200;
 async function apagarContasVencidas(sb: Banco, x: ResultadoDaFaxina, petshop: string | undefined, segundos: number) {
   const ate = Date.now() + segundos * 1000;
   for (let volta = 0; volta < VOLTAS_DAS_CONTAS; volta++) {
-    const r = await (sb.rpc.bind(sb) as unknown as RpcSolto)("gestao_exclusoes_processar", { p_limite: 5, ...(petshop ? { p_petshop: petshop } : {}) });
+    const r = await rpcSolto(sb)("gestao_exclusoes_processar", { p_limite: 5, ...(petshop ? { p_petshop: petshop } : {}) });
     if (r.error) throw Object.assign(new Error(r.error.message), { name: "ErroDaFaxina" });
     const d = (r.data ?? {}) as { lojas?: number; usuarios?: string[]; pendentes?: number; linhas?: number; falhas?: number };
     const lojas = Number(d.lojas ?? 0), linhas = Number(d.linhas ?? 0);
@@ -155,7 +155,7 @@ async function apagarContasVencidas(sb: Banco, x: ResultadoDaFaxina, petshop: st
  * (formulário cancelado). Os arquivos da fila saem logo abaixo, em faxinaGeral. Banco de antes da migração: segue sem isso.
  */
 async function faxinaDaPrivacidade(sb: Banco, x: ResultadoDaFaxina, petshop?: string) {
-  const r = await (sb.rpc.bind(sb) as unknown as RpcSolto)("gestao_faxina_lgpd", petshop ? { p_petshop: petshop } : {});
+  const r = await rpcSolto(sb)("gestao_faxina_lgpd", petshop ? { p_petshop: petshop } : {});
   if (r.error) {
     if (/PGRST202|42883/.test(r.error.code ?? "") || /Could not find the function/i.test(r.error.message)) return;
     throw Object.assign(new Error(r.error.message), { name: "ErroDaFaxina" });
@@ -165,6 +165,8 @@ async function faxinaDaPrivacidade(sb: Banco, x: ResultadoDaFaxina, petshop?: st
 }
 
 type RpcSolto = (f: string, a: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message: string; code?: string } | null }>;
+/** `sb.rpc` sem os tipos do banco (funções que podem não existir ainda). Sem `.bind`: com tantas funções, o TypeScript não consegue resolver os tipos dele. */
+const rpcSolto = (sb: Banco): RpcSolto => (f, a) => (sb as unknown as { rpc: RpcSolto }).rpc(f, a);
 
 /**
  * Logins que sobraram de contas apagadas (fila `logins_lixo`, migração 20261229): cada um sai do Auth e, saindo, sai da fila.
@@ -172,7 +174,7 @@ type RpcSolto = (f: string, a: Record<string, unknown>) => PromiseLike<{ data: u
  * login que continua solto: quem entrou em outro pet shop nesse meio tempo não é apagado.
  */
 async function apagarLoginsDaFila(sb: Banco, x: ResultadoDaFaxina, petshop?: string) {
-  const rpc = sb.rpc.bind(sb) as unknown as RpcSolto;
+  const rpc = rpcSolto(sb);
   const r = await rpc("gestao_logins_lixo", { p_limite: 100, ...(petshop ? { p_petshop: petshop } : {}) });
   if (r.error) {
     if (/PGRST202|42883/.test(r.error.code ?? "") || /Could not find the function/i.test(r.error.message)) return; // banco de antes da 20261229

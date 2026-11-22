@@ -26,7 +26,7 @@ async function tratar(req: Request) {
   const { data: u } = await sb.auth.getUser(token);
   if (!u.user) return json(401, { erro: "sem_login", mensagem: "Entre de novo para apagar o login." });
 
-  const r = await (sb.rpc.bind(sb) as unknown as Rpc)("meu_login_apagar");
+  const r = await (sb as unknown as { rpc: Rpc }).rpc("meu_login_apagar");
   if (r.error) return json(409, { erro: "recusado", mensagem: r.error.message });
   const d = (r.data ?? {}) as { ok?: boolean; motivo?: string };
   if (!d.ok) {
@@ -37,7 +37,8 @@ async function tratar(req: Request) {
   let apagado = false;
   const svc = bancoDeServico();
   if (svc) {
-    const rpc = svc.rpc.bind(svc) as unknown as Rpc;
+    // sem `.bind`: com tantas funções no banco, o TypeScript não consegue resolver os tipos dele
+    const rpc: Rpc = (f, a) => (svc as unknown as { rpc: Rpc }).rpc(f, a);
     const fila = await rpc("gestao_logins_lixo", { p_limite: 500 });
     if (!fila.error && Array.isArray(fila.data) && (fila.data as string[]).includes(u.user.id)) {
       const del = await svc.auth.admin.deleteUser(u.user.id);

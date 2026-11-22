@@ -9,7 +9,10 @@ import type { Banco } from "./supabase";
 const carregar = () => import("./supabase");
 
 type SoRpc = Pick<Banco, "rpc">;
-const rpc = ((...args: Parameters<Banco["rpc"]>) => carregar().then((m) => m.banco().rpc(...args))) as unknown as Banco["rpc"];
+// os argumentos passam soltos (sem `Parameters<Banco["rpc"]>`): com tantas funções no banco, o TypeScript não consegue resolver
+// esse tipo; quem chama continua com os tipos de `Banco["rpc"]`
+type RpcSolto = (...args: unknown[]) => unknown;
+const rpc = ((...args: unknown[]) => carregar().then((m) => (m.banco() as unknown as { rpc: RpcSolto }).rpc(...args))) as unknown as Banco["rpc"];
 const cliente: SoRpc = { rpc };
 
 export function bancoDepois(): SoRpc {

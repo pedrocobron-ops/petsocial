@@ -120,7 +120,7 @@ const BASE: TopicoBase[] = [
     passos: [
       "Abra Hoje: é a primeira tela do sistema.",
       "No alto, ao lado do seu nome, fica o botão do que o pet shop mais faz: Marcar horário, Fazer check-in, Nova reserva ou Vender. Ele muda conforme a área principal.",
-      "Na primeira vez que você abre o sistema no dia, o cartão Bom dia! O que importa hoje traz até três linhas: a agenda e o tempo livre, quem está na casa, quem deve e vem hoje, vacina vencendo de quem vem, pacote no último uso e aniversário. Toque em Perguntar ao Mozart para conversar sobre o dia, ou no X para dispensar por hoje.",
+      "Na primeira vez que você abre o sistema no dia (a partir das 5h), aparece a folha Resumo do dia: os atendimentos de hoje com os horários livres, a semana, o dinheiro (só para quem cuida dele) e uma dica tirada dos seus próprios números. Toque em Ouvir para o Mozart ler, em Útil ou Não quero esse tipo para ensinar que dicas mostrar, e em Começar o dia para fechar. Ela não abre de novo no mesmo dia; para rever, toque no botão Resumo do dia, aqui na tela Hoje.",
       "Logo abaixo, o Mozart resume o dia em uma frase.",
       { so: ["banho"], texto: "O cartão ao lado mostra o Próximo atendimento. Toque nele para abrir o horário." },
       { so: ["casa"], texto: "Quem tem creche ou hotel vê quantos pets estão na casa agora, quem chega e quem sai hoje." },
@@ -2663,7 +2663,7 @@ const BASE: TopicoBase[] = [
       "Na planilha de produtos (Trazer de planilha), as colunas Validade e Lote já marcam Controlar validade e põem o saldo no lote.",
       "Nas Etiquetas, marque Mostrar validade e lote para a etiqueta sair com a validade (a da entrada ou a do lote que vence antes).",
       "A ficha do produto mostra o saldo de cada lote e o que entrou sem lote.",
-      "A tela Hoje e o Bom dia do Mozart avisam quem cuida do estoque quando tem produto vencido ou vencendo em até 30 dias.",
+      "A tela Hoje e o Resumo do dia avisam quem cuida do estoque quando tem produto vencido ou vencendo em até 30 dias.",
       "Quem vê o financeiro também vê quanto vale o que está vencendo, a preço de custo.",
       "Pelo Mozart: \"o que está vencendo?\".",
     ],

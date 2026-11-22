@@ -3073,6 +3073,46 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"resumo_dica_votos": {
+                  Row: {
+                    "criado_em": string,"dia": string,"petshop_id": string,"tipo": string,"user_id": string,"voto": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "criado_em"?: string,"dia": string,"petshop_id": string,"tipo": string,"user_id": string,"voto": string
+                  }
+                  Update: {
+                    "criado_em"?: string,"dia"?: string,"petshop_id"?: string,"tipo"?: string,"user_id"?: string,"voto"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "resumo_dica_votos_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"resumo_do_dia": {
+                  Row: {
+                    "criado_em": string,"dia": string,"dica": Json | null,"dica_chave": string | null,"dica_tipo": string | null,"ia_dica": string | null,"ia_em": string | null,"ia_estado": string | null,"ia_frase": string | null,"petshop_id": string,"user_id": string,"visto_em": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "criado_em"?: string,"dia": string,"dica"?: Json | null,"dica_chave"?: string | null,"dica_tipo"?: string | null,"ia_dica"?: string | null,"ia_em"?: string | null,"ia_estado"?: string | null,"ia_frase"?: string | null,"petshop_id": string,"user_id": string,"visto_em"?: string | null
+                  }
+                  Update: {
+                    "criado_em"?: string,"dia"?: string,"dica"?: Json | null,"dica_chave"?: string | null,"dica_tipo"?: string | null,"ia_dica"?: string | null,"ia_em"?: string | null,"ia_estado"?: string | null,"ia_frase"?: string | null,"petshop_id"?: string,"user_id"?: string,"visto_em"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "resumo_do_dia_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"rotinas_execucoes": {
                   Row: {
                     "criada_em": string,"falhas_seguidas": number,"nome": string,"resultado": Json | null,"ultima_em": string | null,"ultima_ok_em": string | null,"ultimo_erro": string | null,"ultimo_erro_em": string | null
@@ -4048,6 +4088,7 @@ isOneToOne: false
 "escala": Json | null,
 "funcao": string | null,
 "id": string,
+"mozart_automatico": boolean,
 "nome": string,
 "papel": Database["public"]['Enums']["papel_equipe"],
 "petshop_id": string,
@@ -4260,6 +4301,21 @@ isOneToOne: false
                            },
 "gestao_modo_envio":
 { Args: { "p": string,"p_dias"?: number }; Returns: Json
+                           },
+"gestao_resumo_do_dia":
+{ Args: { "p": string }; Returns: Json
+                           },
+"gestao_resumo_ia_guardar":
+{ Args: { "p": string,"p_dica"?: string,"p_estado": string,"p_frase"?: string }; Returns: boolean
+                           },
+"gestao_resumo_ia_reservar":
+{ Args: { "p": string }; Returns: Json
+                           },
+"gestao_resumo_visto":
+{ Args: { "p": string }; Returns: boolean
+                           },
+"gestao_resumo_votar":
+{ Args: { "p": string,"p_tipo": string,"p_voto": string }; Returns: Json
                            },
 "gestao_sinal":
 { Args: { "p": string,"p_ate": string,"p_de": string }; Returns: string
@@ -4894,6 +4950,9 @@ isOneToOne: false
                            },
 "relatorio_promocoes":
 { Args: { "p": string,"p_ate": string,"p_de": string }; Returns: Json
+                           },
+"resumo_dia_em":
+{ Args: { "p_fuso": string,"p_quando": string }; Returns: string
                            },
 "rotina_anotar":
 { Args: { "p_erro"?: string,"p_nome": string,"p_ok": boolean,"p_resultado"?: Json }; Returns: undefined

@@ -27,14 +27,13 @@ import { fraseDoDiaFechado } from "@/lib/gestao/feriados";
 import { useCalendario } from "@/components/gestao/calendario";
 import { frenteDe, nomeDaCasa, principalDe, usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { ChegamESaem, FrenteDaLoja, RecebidoNaSemana, ROTA_VENDER, pedidosDaFrente } from "@/components/gestao/hoje-frente";
-import { AvatarPet, Esqueleto, LinkDeGravar, Vazio, abrirAssistente, useAdiantar, useDados } from "@/components/gestao/ui";
+import { AvatarPet, Esqueleto, LinkDeGravar, Vazio, abrirAssistente, abrirResumoDoDia, useAdiantar, useDados } from "@/components/gestao/ui";
 import dynamic from "next/dynamic";
 import { ErroDeTeste } from "@/components/gestao/erros";
 import { registrarErro } from "@/lib/gestao/erros-navegador";
 import { lerSinal } from "@/lib/gestao/sinal";
 import { lerExtrasDoHoje, nomesEMais } from "@/lib/gestao/hoje-extras";
 import LinkRapido from "@/components/gestao/agenda/link-rapido";
-import BomDia from "@/components/gestao/bom-dia";
 import { fraseDaContaFixa, lerAvisosContasFixas } from "@/lib/gestao/contas-fixas";
 import ChamarDeVolta, { aniversariantes, buscarParaChamar, chamadoEm, lerChamados, quemSumiu, type AbaChamar, type GrupoChamar } from "@/components/gestao/clientes/chamar-de-volta";
 import LembretesDoDia, { BotaoLembrete } from "@/components/gestao/agenda/lembretes";
@@ -391,8 +390,8 @@ export default function Hoje() {
         {casa && primeiroOlhar && <CuidadosDeAgora />}
         {cr && cartaoDaChamada && <ChamadaDeHoje esperados={cr.esperados} aindaNao={cr.aindaNao} naCasa={cr.naCasa} sairam={cr.sairam} faltaram={cr.faltaram.length} />}
 
-        {/* "Bom dia" do Mozart: primeira abertura do dia, até 3 linhas; lê sozinho (gestao_bom_dia), não depende dos dados desta tela */}
-        {!contaNova && <BomDia />}
+        {/* Resumo do dia: a folha abre sozinha na primeira entrada do dia (casca); aqui fica o botão para rever */}
+        <button type="button" className="g-btn p sec" style={{ justifySelf: "start" }} data-teste="resumo-rever" onClick={abrirResumoDoDia}><CalendarDays />Resumo do dia</button>
 
         {/* Modo envio: "Mandar N mensagens" (lembretes, pet pronto, saúde, aniversário, pacote, cobrança, chamar de volta), depois do primeiro olhar */}
         {!contaNova && extras && <EntradaModoEnvio pronto={primeiroOlhar} contagem={extras.tem ? extras.x?.envio ?? null : undefined} />}
