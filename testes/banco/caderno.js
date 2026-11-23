@@ -36,6 +36,10 @@ function pdf(n) {
   };
   const foto = (n = 1) => Array.from({ length: n }, (_, i) => [`f${i}.jpg`, JPEG, 'image/jpeg']);
   const anon0 = () => B.cliente();
+  // o limite em vigor para esta loja (em teste: 10 páginas por dia; quem paga: 20; migração 20261248, saldo único com o Mozart)
+  const limiteDaLoja = () => B.num(`select (public.paginas_ia_limites('${P}') ->> 'limite')::int`);
+  // cada parte do teste começa com o saldo do dia cheio (o limite do teste é menor do que as páginas que o arquivo inteiro lê)
+  const zerarUso = () => B.sql(`delete from caderno_uso where petshop_id='${P}'`);
   const usoHoje = (p = P) => B.num(`select coalesce(sum(paginas), 0) from caderno_uso where petshop_id='${p}' and dia = (now() at time zone 'America/Sao_Paulo')::date`);
 
   T.secao('quem pode ler');
@@ -97,6 +101,7 @@ function pdf(n) {
 
   T.secao('leitura que falha não conta (migração 20261195)');
   const reservas = () => B.num(`select count(*) from caderno_reservas where petshop_id='${P}'`);
+  zerarUso();
   let antesF = usoHoje(), resAntes = reservas();
   r = await ler(L.sb.dono, 'clientes', foto(2), { campos: { teste_falha: 'erro' } });
   T.ok('erro do modelo (ou demora): 502, as 2 páginas voltam', r.status === 502 && r.j?.erro === 'ia_fora' && usoHoje() === antesF && reservas() === resAntes, { r, uso: usoHoje() - antesF });
@@ -114,7 +119,7 @@ function pdf(n) {
   T.ok('devolver de novo não tira mais nada', (await L.sb.dono.rpc('caderno_devolver', { p_reserva: rv.reserva })).data?.ok === false && usoHoje() === antesF);
   T.ok('reserva que não existe: nada', (await L.sb.dono.rpc('caderno_devolver', { p_reserva: B.uuid() })).data?.ok === false);
   // duas leituras ao mesmo tempo com uma página sobrando: uma passa, a outra ouve o limite
-  const limC = B.num(`select public.link_limite('caderno_dia', 30)`);
+  const limC = limiteDaLoja();
   B.sql(`update caderno_uso set paginas = ${limC - 1} where petshop_id='${P}' and dia = (now() at time zone 'America/Sao_Paulo')::date`);
   const duas = await Promise.all([ler(L.sb.dono, 'clientes', foto(1)), ler(L.sb.caixa, 'clientes', foto(1))]);
   T.ok('duas ao mesmo tempo na última página: uma lê, a outra ouve o limite', duas.filter((x) => x.status === 200).length === 1 && duas.filter((x) => x.status === 429).length === 1 && usoHoje() === limC, duas.map((x) => x.status));
@@ -129,6 +134,7 @@ function pdf(n) {
   B.sql(`update caderno_uso set paginas = ${antesF} where petshop_id='${P}' and dia = (now() at time zone 'America/Sao_Paulo')::date`);
 
   T.secao('PDF grande pela pasta temporária (caderno-tmp)');
+  zerarUso();
   const tmp = (sb, nome, buf, tipo = 'application/pdf') => sb.storage.from('caderno-tmp').upload(nome, new Blob([buf], { type: tipo }), { contentType: tipo });
   const existe = (nome) => B.num(`select count(*) from storage.objects where bucket_id = 'caderno-tmp' and name = '${nome}'`) === 1;
   const grande = Buffer.concat([pdf(2), Buffer.alloc(6 * 1024 * 1024, 32)]);
@@ -169,12 +175,15 @@ function pdf(n) {
   T.ok('estoque (sem Clientes) não conta', (await L.sb.estoque.rpc('caderno_contar', { p_petshop: P, p_paginas: 1 })).data?.motivo === 'sem_acesso');
   T.ok('ninguém lê a tabela de uso direto', ((await L.sb.dono.from('caderno_uso').select('*')).data ?? []).length === 0);
   T.ok('nenhuma coluna de texto na tabela de uso (nada das fotos)', B.num(`select count(*) from information_schema.columns where table_name = 'caderno_uso' and data_type = 'text'`) === 0);
-  const lim = B.num(`select public.link_limite('caderno_dia', 30)`);
+  zerarUso();
+  B.must(await L.sb.dono.rpc('caderno_contar', { p_petshop: P, p_paginas: 1 }), 'uma página');
+  const lim = limiteDaLoja();
+  T.ok('loja em teste: o limite é o do teste (padrão 10), nunca acima do de quem paga (padrão 20)', lim === Math.min(B.num(`select public.link_limite('caderno_dia', 20)`), B.num(`select public.link_limite('caderno_teste_dia', 10)`)), lim);
   const q0 = B.must(await L.sb.dono.rpc('caderno_contar', { p_petshop: P, p_paginas: 0 }), 'quanto resta');
   T.ok('com 0 páginas, só diz quanto resta (sem contar)', q0.ok && q0.restam === lim - usoHoje() && q0.limite === lim, q0);
   B.sql(`update caderno_uso set paginas = ${lim - 1} where petshop_id='${P}' and dia = (now() at time zone 'America/Sao_Paulo')::date`);
   r = await ler(L.sb.dono, 'clientes', foto(2));
-  T.ok('2 fotos com 1 página sobrando: 429, com quanto resta', r.status === 429 && r.j?.erro === 'limite' && r.j.restam === 1 && /1 página/.test(r.j.mensagem), r);
+  T.ok('2 fotos com 1 página sobrando: 429, com quanto resta', r.status === 429 && r.j?.erro === 'limite' && r.j.restam === 1 && /Hoje ainda dá para ler 1 foto ou página \(o limite do período de teste é de \d+ por dia\)/.test(r.j.mensagem) && r.j.teste === true, r);
   r = await ler(L.sb.dono, 'clientes', foto(1));
   T.ok('1 foto ainda cabe', r.status === 200 && r.j.restam === 0, r);
   r = await ler(L.sb.dono, 'clientes', foto(1));

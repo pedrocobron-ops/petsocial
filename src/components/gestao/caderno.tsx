@@ -8,7 +8,7 @@ import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { lancarAReceber, parteDaChave } from "@/lib/gestao/dinheiro";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import {
-  BUCKET_CADERNO_TMP, LADO_DA_FOTO, LIMITE_DO_ENVIO, MAX_BYTES_PDF, MAX_IMAGENS, MAX_PAGINAS_PDF, MAX_PDFS, TIPOS_DA_PAGINA,
+  BUCKET_CADERNO_TMP, LIMITE_DO_ENVIO, MAX_BYTES_PDF, MAX_IMAGENS, MAX_PAGINAS_PDF, MAX_PDFS, TIPOS_DA_PAGINA,
   type AreaLida, type DestinoDoPreco, type Leitura, type RespostaCaderno, type TipoCuidado, type TipoDaPagina,
 } from "@/lib/gestao/caderno";
 import { AREAS_DE_SERVICO, areaDoServico, areasDeServicoPara, categoriaDaArea } from "@/lib/gestao/modulos";
@@ -17,6 +17,8 @@ import { CAMPOS_PRECO, corLivre, inserirServico, mudarServico, type Precos } fro
 import { TIPOS_SAUDE } from "./clientes/saude";
 import { useGestao } from "./contexto";
 import { CampoValor, Folha, avisarMudanca, mensagemDeErro, ok, useAvisos, useSomenteLeitura } from "./ui";
+import { ehHeic, paginasDoPdf, paraJpeg } from "./arquivos-ia";
+import { lerSaldo, textoDoLimiteDePaginas, type SaldoDePaginas } from "@/lib/gestao/limites-ia";
 import "./caderno.css";
 
 type Arq = { id: string; nome: string; pdf: boolean; blob: Blob; previa: string | null; paginas: number };
@@ -49,40 +51,6 @@ const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um :
 const PORTES = ["", "P", "M", "G", "GG"];
 const NOME_PORTE: Record<string, string> = { preco_p: "P", preco_m: "M", preco_g: "G", preco_gg: "GG" };
 
-/** Foto HEIC (o formato das fotos do iPhone): só abre onde o navegador sabe abrir (Safari). */
-const ehHeic = (f: File) => /^image\/hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name);
-/** Diminui a foto no aparelho (lado maior 1600 px, JPEG): a leitura fica igual e o envio fica leve. HEIC só abre onde o navegador sabe abrir. */
-async function paraJpeg(f: File): Promise<Blob> {
-  const url = URL.createObjectURL(f);
-  try {
-    const img = new Image();
-    img.src = url;
-    await img.decode();
-    const k = Math.min(1, LADO_DA_FOTO / Math.max(img.naturalWidth, img.naturalHeight));
-    const w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
-    const c = document.createElement("canvas");
-    c.width = w; c.height = h;
-    const ctx = c.getContext("2d");
-    if (!ctx) throw new Error("sem canvas");
-    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, w, h);
-    ctx.drawImage(img, 0, 0, w, h);
-    const b = await new Promise<Blob | null>((ok) => c.toBlob(ok, "image/jpeg", 0.82));
-    if (!b) throw new Error("sem jpeg");
-    return b;
-  } finally { URL.revokeObjectURL(url); }
-}
-/** Páginas do PDF contadas no aparelho (o servidor confere de novo). 0 = não deu para contar. */
-async function paginasDoPdf(f: File): Promise<number> {
-  try {
-    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-    pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/legacy/build/pdf.worker.min.mjs", import.meta.url).toString();
-    const d = await pdfjs.getDocument({ data: new Uint8Array(await f.arrayBuffer()), isEvalSupported: false }).promise;
-    const n = d.numPages;
-    void d.destroy();
-    return n;
-  } catch { return 0; }
-}
-
 /**
  * Trazer do caderno ou do outro sistema: foto do caderno, print de tela ou PDF exportado. A IA lê no servidor, a pessoa confere
  * cada linha aqui (corrige, desmarca, junta com quem já existe) e nada é salvo antes de "Salvar N itens".
@@ -106,7 +74,7 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
   const [preparando, setPreparando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [etapa, setEtapa] = useState<"escolher" | "lendo" | "conferir" | "pronto">("escolher");
-  const [cota, setCota] = useState<{ restam: number; limite: number } | null>(null);
+  const [cota, setCota] = useState<SaldoDePaginas | null>(null);
   const [clientes, setClientes] = useState<LinhaCliente[]>([]);
   const [dividas, setDividas] = useState<LinhaDivida[]>([]);
   const [horarios, setHorarios] = useState<LinhaHorario[]>([]);
@@ -142,8 +110,8 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
   useEffect(() => {
     let vale = true;
     void sb.rpc("caderno_contar", { p_petshop: petshop.id, p_paginas: 0 }).then((r) => {
-      const c = r.data as { ok?: boolean; restam?: number; limite?: number } | null;
-      if (vale && c?.ok) setCota({ restam: c.restam ?? 0, limite: c.limite ?? 0 });
+      const c = r.data as { ok?: boolean } | null;
+      if (vale && c?.ok) setCota(lerSaldo(c));
     }, () => {});
     return () => { vale = false; };
   }, [sb, petshop.id]);
@@ -196,7 +164,7 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
 
   async function ler() {
     if (!tipo || !arqs.length || somenteLeitura()) return;
-    if (cota && paginas > cota.restam) { setErro(cota.restam ? `Hoje ainda dá para ler ${plural(cota.restam, "página", "páginas")}. Tire alguma foto ou página da lista, ou continue amanhã.` : `Hoje já foram lidas as ${cota.limite} páginas do dia. Amanhã dá para ler mais.`); return; }
+    if (cota && paginas > cota.restam) { setErro(cota.restam ? `Hoje ainda dá para ler ${plural(cota.restam, "página", "páginas")}. Tire alguma foto ou página da lista, ou continue amanhã.` : textoDoLimiteDePaginas(cota)); return; }
     setErro(null); setEtapa("lendo");
     const temporarios: string[] = [];
     try {
@@ -228,12 +196,12 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
       const j = (await r.json().catch(() => null)) as RespostaCaderno | null;
       if (!r.ok || !j || "erro" in j) {
         const e = j && "erro" in j ? j : null;
-        if (e?.limite != null) setCota({ restam: e.restam ?? 0, limite: e.limite });
+        if (e?.limite != null) setCota(lerSaldo(e));
         setErro(r.status === 413 && !e ? "Os arquivos são grandes demais para mandar de uma vez. Mande menos páginas por vez." : e?.mensagem ?? "Não deu para ler agora. Confira a internet e tente de novo.");
         setEtapa("escolher");
         return;
       }
-      setCota({ restam: j.restam, limite: j.limite });
+      setCota(lerSaldo(j));
       setJa(existentes);
       if (pet) setSaudeJa(ok(await sb.from("pets_saude").select("tipo, nome, aplicado_em").eq("petshop_id", petshop.id).eq("pet_id", pet.id).limit(500)));
       montarConferencia(j.leitura);
@@ -847,7 +815,7 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
           <p className="g-cad-privado"><Lock aria-hidden />As fotos e arquivos servem só para a leitura: não ficam guardados. PDF grande passa por uma pasta reservada e é apagado logo depois de ler.</p>
           {cota && (
             <p className="g-muted g-pp" data-cota>
-              {cota.restam > 0 ? `Hoje ainda dá para ler ${plural(cota.restam, "página", "páginas")} (cada foto, print ou página de PDF conta uma).` : `Hoje já foram lidas as ${cota.limite} páginas do dia. Amanhã dá para ler mais.`}
+              {cota.restam > 0 ? `Hoje ainda dá para ler ${plural(cota.restam, "página", "páginas")} (cada foto, print ou página de PDF conta uma; as fotos mandadas ao Mozart usam o mesmo saldo).` : textoDoLimiteDePaginas(cota)}
             </p>
           )}
           {erro && <p className="g-aviso vermelho" role="alert">{erro}</p>}

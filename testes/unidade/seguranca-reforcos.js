@@ -47,7 +47,7 @@ const ler = (c) => fs.readFileSync(path.join(B.RAIZ, c), 'utf8');
     assert.match(cfg, /h\.key !== "Referrer-Policy" && !ehCsp\(h\)/);
   });
   t('os scripts em linha da abertura levam o nonce', () => assert.equal((ler('src/components/gestao/contexto.tsx').match(/<script nonce=\{nonce\}/g) ?? []).length, 2));
-  t('o leitor de PDF não testa eval (o teste dispararia a regra)', () => { assert.match(ler('src/components/gestao/caderno.tsx'), /isEvalSupported: false/); assert.match(ler('src/components/gestao/escola/leitor.tsx'), /isEvalSupported: false/); });
+  t('o leitor de PDF não testa eval (o teste dispararia a regra)', () => { assert.match(ler('src/components/gestao/arquivos-ia.ts'), /isEvalSupported: false/); assert.match(ler('src/components/gestao/escola/leitor.tsx'), /isEvalSupported: false/); });
 
   T.secao('fotos dos pets e logo');
   const { logoDaLoja } = lib('supabase-config');

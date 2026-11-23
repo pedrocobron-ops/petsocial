@@ -72,11 +72,16 @@ const FRASES: Record<string, (e: Entrada | null, agora?: string, casa?: string) 
   registrar_ocorrencia: () => "Preparando a ocorrência para você conferir…",
 };
 
-/** A primeira frase de cada pedido, antes de o modelo responder: "Pensando…" ou, depois do "Pode fazer", "Conferindo o que ficou feito…". */
+/** A primeira frase de cada pedido, antes de o modelo responder: "Pensando…", "Olhando a foto…" (pedido com anexo) ou, depois do "Pode fazer", "Conferindo o que ficou feito…". */
 export function fraseInicial(mensagens: { role: string; content?: unknown }[]): string {
   const ultima = mensagens[mensagens.length - 1];
   const respondeuCartao = ultima?.role === "user" && Array.isArray(ultima.content) && ultima.content.some((b) => (b as { type?: string })?.type === "tool_result");
-  return respondeuCartao ? "Conferindo o que ficou feito…" : "Pensando…";
+  if (respondeuCartao) return "Conferindo o que ficou feito…";
+  // pedido com foto, print ou PDF: a leitura demora um pouco mais
+  const tipos = ultima?.role === "user" && Array.isArray(ultima.content) ? ultima.content.map((b) => (b as { type?: string })?.type) : [];
+  if (tipos.includes("document")) return "Lendo o PDF…";
+  if (tipos.includes("image")) return "Olhando a foto…";
+  return "Pensando…";
 }
 /** Depois das consultas, enquanto o modelo escreve a resposta com o que elas trouxeram. */
 export const FRASE_JUNTANDO = "Juntando a resposta…";

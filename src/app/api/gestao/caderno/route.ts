@@ -5,6 +5,7 @@ import { bancoDoUsuario, configurado } from "@/lib/gestao/supabase";
 import type { Json } from "@/lib/gestao/banco";
 import { comRegistro, erroDoBanco, registrarErroServidor } from "@/lib/gestao/erros-servidor";
 import { BUCKET_CADERNO_TMP, MAX_BYTES_IMAGEM, MAX_BYTES_PDF, MAX_IMAGENS, MAX_PAGINAS_PDF, MAX_PDFS, caminhoTemporarioValido, limparLeitura, type Leitura, type TipoDaPagina } from "@/lib/gestao/caderno";
+import { textoDoLimiteDePaginas } from "@/lib/gestao/limites-ia";
 import { ESQUEMA_CADERNO, INSTRUCOES_CADERNO, leituraDeTeste, paginasDoPdf, pedidoDaLeitura, tipoDoArquivo, type TipoArquivo } from "@/lib/gestao/caderno-ia";
 
 export const runtime = "nodejs";
@@ -20,9 +21,8 @@ const RASCUNHO = /^(caderno|caderno_pet:[0-9a-f-]{36})$/;
 
 const erro = (status: number, codigo: string, mensagem: string, extra?: Record<string, unknown>) => NextResponse.json({ erro: codigo, mensagem, ...extra }, { status });
 const FORA = "A leitura não está funcionando agora. Tente de novo mais tarde; enquanto isso, dá para cadastrar pela tela ou trazer de uma planilha.";
-const LIMITE = (limite: number, restam: number) => restam > 0
-  ? `Hoje ainda dá para ler ${restam === 1 ? "1 página" : `${restam} páginas`} (o limite é ${limite} por dia). Mande menos fotos ou páginas, ou continue amanhã.`
-  : `Hoje já foram lidas as ${limite} páginas do dia. Amanhã dá para ler mais; o que já foi lido e salvo continua aqui.`;
+/** O limite do dia (um saldo só para a Foto do caderno e para os anexos do Mozart) sai com os números do banco: `limites-ia.ts`. */
+const LIMITE = (c: { restam?: number; limite?: number; pago?: number; teste?: boolean }) => textoDoLimiteDePaginas({ restam: c.restam ?? 0, limite: c.limite ?? 0, pago: c.pago, teste: c.teste });
 
 function hojeNoFuso(fuso: string) {
   try { return new Intl.DateTimeFormat("en-CA", { timeZone: fuso }).format(new Date()); } catch { return new Date().toISOString().slice(0, 10); }
@@ -37,7 +37,8 @@ type Arquivo = { tipo: TipoArquivo; dados: string; paginas: number };
  * PDF grande (a Vercel recusa pedidos acima de ~4,5 MB) sobe antes para o bucket privado caderno-tmp, em <petshop>/<aleatório>.pdf:
  * aqui chega só o caminho (caminho, com as páginas em paginas_caminho); a rota baixa com o login da pessoa e apaga na hora.
  * Os arquivos ficam só na memória deste pedido: não são gravados nem vão para o registro de erros.
- * O limite do dia é reservado antes de ler e devolvido se a leitura falhar (erro do modelo, demora, recusa).
+ * O limite do dia é reservado antes de ler e devolvido se a leitura falhar (erro do modelo, demora, recusa). O saldo é um
+ * só com os anexos do Mozart (20 páginas por dia para quem paga, 10 no teste; migração 20261248).
  */
 async function tratar(req: Request) {
   if (!configurado) return erro(503, "sem_banco", "O sistema ainda não está ligado neste endereço.");
@@ -119,10 +120,11 @@ async function tratar(req: Request) {
   let conta = await sb.rpc("caderno_reservar", { p_petshop: petshopId, p_paginas: paginas });
   if (conta.error && /caderno_reservar|PGRST202|42883/.test(`${conta.error.code ?? ""} ${conta.error.message}`)) conta = await sb.rpc("caderno_contar", { p_petshop: petshopId, p_paginas: paginas });
   if (conta.error) { await registrarErroServidor("/api/gestao/caderno", erroDoBanco(conta.error, "caderno_reservar"), { petshop: petshopId }); return erro(503, "fora", FORA); }
-  const c = (conta.data ?? {}) as { ok?: boolean; motivo?: string; restam?: number; limite?: number; reserva?: string };
+  const c = (conta.data ?? {}) as { ok?: boolean; motivo?: string; restam?: number; limite?: number; pago?: number; teste?: boolean; reserva?: string };
+  const numeros = { restam: c.restam, limite: c.limite, pago: c.pago, teste: c.teste };
   if (!c.ok) {
-    if (c.motivo === "limite") return erro(429, "limite", LIMITE(c.limite ?? 0, c.restam ?? 0), { restam: c.restam, limite: c.limite });
-    if (c.motivo === "geral") return erro(429, "ocupado", "A leitura está com muitos pedidos hoje. Tente de novo amanhã.", { restam: c.restam, limite: c.limite });
+    if (c.motivo === "limite") return erro(429, "limite", LIMITE(c), numeros);
+    if (c.motivo === "geral") return erro(429, "ocupado", "A leitura está com muitos pedidos hoje. Tente de novo amanhã.", numeros);
     if (c.motivo === "fechado") return erro(403, "fechado", "A conta está só para consulta: a leitura volta quando a assinatura estiver em dia.");
     if (c.motivo === "email") return erro(403, "email", "No teste grátis, a leitura começa depois que o e-mail do dono da conta é confirmado. Para confirmar, saia, toque em \"Esqueci a senha\" na tela de entrar e abra o link que chega no e-mail.");
     return erro(403, "sem_acesso", "Trazer do caderno é para quem cuida dos clientes. Peça ao dono do pet shop.");
@@ -141,7 +143,7 @@ async function tratar(req: Request) {
       await sb.from("rascunhos").upsert({ petshop_id: petshopId, tipo: rascunho, dados: { versao: 1, tipo, leitura: r, lido_em: new Date().toISOString(), paginas } as unknown as NonNullable<Json> },
         { onConflict: "petshop_id,user_id,tipo" }).then(() => null, () => null);
     }
-    return NextResponse.json({ leitura: r, restam: c.restam ?? 0, limite: c.limite ?? 0, paginas });
+    return NextResponse.json({ leitura: r, restam: c.restam ?? 0, limite: c.limite ?? 0, pago: c.pago, teste: c.teste, paginas });
   } finally {
     // não leu (erro do modelo, demora, recusa, ou quebrou no meio): as páginas voltam para o limite do dia
     if (!leu && c.reserva) await sb.rpc("caderno_devolver", { p_reserva: c.reserva }).then(() => null, () => null);

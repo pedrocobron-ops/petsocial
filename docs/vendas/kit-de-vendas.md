@@ -58,7 +58,7 @@ Cada um com: **o que é**, **por que importa para a dona do pet shop** e **como 
   ficou em **Verificar**. Nada é salvo antes do botão **Salvar**. Na ficha do pet, lê a carteirinha de vacinação.
 - **Por que importa:** o maior medo de trocar de sistema é digitar tudo de novo. Aqui a dona fotografa e confere. A dívida do
   caderno vira conta a receber com o dia em que começou, e o dinheiro só entra no caixa quando o cliente pagar. O que não deu
-  para ler fica em branco: nada é inventado. As fotos não ficam guardadas. Limite de 30 páginas lidas por dia.
+  para ler fica em branco: nada é inventado. As fotos não ficam guardadas. Limite de páginas lidas por dia: 20 no plano pago, 10 no teste.
 - **Como mostrar em 30 s:** Clientes e pets → **Foto do caderno** → **Clientes e pets** → fotografe uma página escrita à mão →
   **Ler** → mostre as linhas, uma marcada como **Já existe** e outra como **Verificar** → desmarque uma → **Salvar**. Diga:
   "Você confere linha por linha antes de entrar. Se a letra estiver difícil, ele avisa em vez de inventar."

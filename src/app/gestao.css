@@ -768,6 +768,34 @@ a.g-card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(31, 27,
 .g-ass-conversa { min-height: 0; grid-auto-rows: max-content; }
 .g-proposta { align-content: start; }
 .g-ass-entrada textarea:focus-visible { outline: 0; }
+/* anexo do Mozart: o clipe ao lado do microfone, o menu (tirar foto, galeria, arquivo) e as miniaturas antes de enviar */
+.g-ass-clipe { position: relative; flex: none; }
+.g-ass-clipe-bt { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; border: 0; background: var(--g-campo); color: var(--g-verde); box-shadow: 0 1px 1px rgba(31, 27, 23, .1); cursor: pointer; }
+.g-ass-clipe-bt svg { width: 21px; height: 21px; }
+.g-ass-clipe-bt:focus-visible, .g-ass-clipe-menu button:focus-visible, .g-ass-anexos li button:focus-visible { outline: 3px solid var(--g-verde); outline-offset: 2px; }
+.g-ass-clipe-menu { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 3; display: grid; gap: 2px; width: max-content; max-width: min(300px, calc(100vw - 32px)); padding: 6px; border-radius: 16px; background: var(--g-carta); box-shadow: 0 0 0 1px rgba(31, 27, 23, .08), 0 18px 34px -14px rgba(31, 27, 23, .5); }
+.g-ass-clipe-menu button { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 8px 12px; border: 0; border-radius: 10px; background: none; color: var(--g-tinta); font-size: 1rem; font-weight: 600; text-align: left; cursor: pointer; }
+.g-ass-clipe-menu button:hover { background: var(--g-carta-2); }
+.g-ass-clipe-menu button svg { width: 20px; height: 20px; flex: none; color: var(--g-verde); }
+.g-ass-clipe-menu small { padding: 4px 12px 6px; font-size: .75rem; color: var(--g-cinza); white-space: normal; }
+.g-ass-anexos { display: grid; gap: 6px; padding: 8px 10px 0; background: #efe7d9; min-width: 0; }
+.g-ass-anexos ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.g-ass-anexos li { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.g-ass-anexos li.pdf { max-width: 100%; padding: 6px 44px 6px 6px; border-radius: 12px; background: var(--g-campo); box-shadow: 0 1px 1px rgba(31, 27, 23, .1); }
+.g-ass-anexos img, .g-ass-anexos .ico { width: 64px; height: 64px; flex: none; object-fit: cover; border-radius: 12px; border: 1px solid var(--g-linha); background: var(--g-carta-2); }
+.g-ass-anexos .ico { display: grid; place-items: center; width: 44px; height: 44px; color: var(--g-cinza); }
+.g-ass-anexos .ico svg { width: 22px; height: 22px; }
+.g-ass-anexos .nome { display: grid; min-width: 0; font-size: .875rem; font-weight: 600; overflow-wrap: anywhere; }
+.g-ass-anexos .nome small { font-weight: 400; color: var(--g-cinza); }
+.g-ass-anexos li button { position: absolute; top: -6px; right: -6px; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 999px; border: 2px solid #efe7d9; background: rgba(31, 27, 23, .8); color: #fff; cursor: pointer; }
+/* o alvo do toque é maior que o desenho do botão */
+.g-ass-anexos li button::after { content: ""; position: absolute; inset: -9px; }
+.g-ass-anexos li.pdf button { top: 50%; right: 8px; transform: translateY(-50%); border: 0; }
+.g-ass-anexos li button svg { width: 14px; height: 14px; }
+.g-ass-anexos p { margin: 0; font-size: .8125rem; color: var(--g-escuro-b); overflow-wrap: anywhere; }
+.g-ass-anexos p.erro { color: var(--g-vermelho); font-weight: 600; }
+.g-ass-anexado { display: flex; align-items: center; gap: 5px; margin-bottom: 2px; font-size: .8125rem; font-weight: 600; opacity: .85; }
+.g-so-leitor { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* agenda */
 .g-ag-faixa { padding: 8px; flex-wrap: nowrap; gap: 4px; }

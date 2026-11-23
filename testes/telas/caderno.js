@@ -40,7 +40,9 @@ const nb = (s) => (s ?? '').replace(/ /g, ' ');
     await folha.waitFor();
     T.ok('título e aviso de que a foto não fica guardada', /Trazer do caderno ou do outro sistema/.test(await folha.innerText()) && /não ficam guardados/.test(await folha.innerText()));
     await folha.getByText(/Hoje ainda dá para ler/).first().waitFor({ timeout: 8000 }).catch(() => {}); // a contagem chega um instante depois da folha
-    T.ok('mostra quantas páginas ainda dá para ler hoje', /Hoje ainda dá para ler 30 páginas/.test(await folha.innerText()));
+    // loja em teste: 10 páginas por dia (quem paga: 20), no mesmo saldo dos anexos do Mozart (migração 20261248)
+    const limiteDoTeste = B.num(`select (public.paginas_ia_limites('${P}') ->> 'limite')::int`);
+    T.ok(`mostra quantas páginas ainda dá para ler hoje (${limiteDoTeste}, o limite do teste)`, new RegExp(`Hoje ainda dá para ler ${limiteDoTeste} páginas`).test(await folha.innerText()) && /as fotos mandadas ao Mozart usam o mesmo saldo/.test(await folha.innerText()), await folha.locator('[data-cota]').innerText().catch(() => ''));
     T.ok('os quatro tipos e o "Não sei" (dono)', (await folha.locator('.g-cad-tipo').count()) === 5);
     await folha.locator('.g-cad-tipo', { hasText: 'Não sei, descubra' }).click();
     await escolherFoto(page);
