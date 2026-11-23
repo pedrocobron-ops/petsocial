@@ -10,7 +10,7 @@
 //   · recepção (1366): vê o dinheiro do dia, não as contas a pagar; "Chamar os 3" e "Chamar quem está no prazo" abrem a lista com os
 //     três tutores e nada é enviado sozinho; "Não quero esse tipo".
 //   · tosador (390): só a agenda dele, sem dinheiro. Monitor: viu ontem, abre hoje. Estoque, sem cota de IA: texto sem IA.
-//   · conta nova (1366): não abre por cima do guia inicial; depois dele, abre com "Para começar".
+//   · conta nova (1366): não abre por cima do guia inicial nem logo depois dele, na mesma abertura; na próxima, abre com "Para começar".
 //   · a IA de teste que inventa um número: o texto é descartado e a folha fica com o texto sem IA.
 // Em todas: sem rolagem para o lado, sem erro de console e sem violação da regra de conteúdo (CSP).
 const fs = require('fs');
@@ -273,7 +273,12 @@ const semErros = (c) => c.erros.filter((e) => !/Content Security Policy|CSP-VIOL
   T.ok('com o guia inicial na frente, o resumo espera', await page.locator('.g-guia').isVisible() && (await page.locator('[data-teste=resumo-dia]').count()) === 0);
   T.ok('… e ainda não conta como visto', B.sql(`select count(*) from resumo_do_dia where petshop_id = '${G.P}' and visto_em is not null`) === '0');
   await page.locator('button[aria-label="Fechar o guia"]').click();
-  T.ok('fechado o guia, o resumo abre', await esperarFolha(page));
+  await page.waitForTimeout(2500);
+  T.ok('fechado o guia, o resumo não abre sozinho na mesma abertura (quem acabou de começar segue o caminho do guia)',
+    (await page.locator('[data-teste=resumo-dia]').count()) === 0);
+  T.ok('… e continua sem contar como visto', B.sql(`select count(*) from resumo_do_dia where petshop_id = '${G.P}' and visto_em is not null`) === '0');
+  await page.reload();
+  T.ok('na próxima abertura do aplicativo, sem o guia na frente, o resumo abre', await esperarFolha(page));
   const nova = page.locator('[data-teste=resumo-conta-nova]');
   const falta = await nova.locator('a').allTextContents();
   T.ok('conta nova: "Para começar", com o que falta no cadastro (primeiro pet e ligar o link)', /Para começar/.test(await nova.textContent()) && falta.includes('Cadastrar o primeiro pet') && falta.includes('Ligar o link do cliente'), falta);
