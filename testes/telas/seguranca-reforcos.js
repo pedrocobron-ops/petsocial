@@ -1,6 +1,4 @@
 // Telas dos reforços de segurança (migração 20261245, src/middleware.ts):
-//   - painel do administrador: sem fator, a tela mostra o QR code e o código de texto; o código errado é recusado e o certo
-//     (gerado aqui pelo segredo da tela) abre o painel; outro aparelho com a senha certa pede o código antes do painel;
 //   - a regra de conteúdo VALE no aplicativo e no painel (cabeçalho Content-Security-Policy com nonce, sem 'unsafe-inline' no
 //     script) e nenhuma tela principal dispara `securitypolicyviolation` (nem o painel, aba por aba);
 //   - a foto do pet aparece nas telas da equipe pelo endereço assinado (bucket privado);
@@ -32,13 +30,13 @@ async function vigiarCsp(ctx, page) {
   const L = await criarLoja(T, { nome: 'Reforcos tela' });
   const uid = B.sql(`select user_id from profissionais where petshop_id='${L.P}' and papel='dono'`);
   B.sql(`insert into admins (user_id) values ('${uid}') on conflict do nothing`);
-  T.depois(() => B.sql(`delete from admins where user_id='${uid}'; delete from auth.mfa_factors where user_id='${uid}'`));
+  T.depois(() => B.sql(`delete from admins where user_id='${uid}'`));
   // foto do Thor, para ver a imagem assinada nas telas
   const foto = `${L.P}/${B.uuid()}.jpg`;
   B.must(await L.sb.dono.storage.from('pets').upload(foto, JPG, { contentType: 'image/jpeg' }), 'foto do Thor');
   B.must(await L.sb.dono.from('pets').update({ foto }).eq('id', L.pets.Thor).select('id'), 'foto no cadastro');
 
-  T.secao('painel do administrador: cadastro do segundo fator');
+  T.secao('painel do administrador com a regra de conteúdo que vale, aba por aba');
   {
     const { ctx, page, erros } = await N.contexto(1366, 900);
     const csp = await vigiarCsp(ctx, page);
@@ -47,48 +45,15 @@ async function vigiarCsp(ctx, page) {
     const cab = r?.headers()['content-security-policy'] ?? '';
     T.ok('o painel manda a regra de conteúdo que vale, com nonce e sem unsafe-inline no script', /script-src [^;]*'nonce-[A-Za-z0-9+/=]{16,}'/.test(cab) && !/script-src[^;]*unsafe-inline/.test(cab) && /frame-ancestors 'self'/.test(cab), cab.slice(0, 200));
     T.ok('… e não manda a regra "só avisando" do site', !r?.headers()['content-security-policy-report-only']);
-    await page.locator('[data-teste=mfa-cadastro]').waitFor({ timeout: 30000 });
-    T.ok('sem fator: a tela de cadastro aparece antes do painel', (await page.locator('.g-adm-abas').count()) === 0);
-    const qr = await page.locator('[data-teste=mfa-cadastro] img').getAttribute('src');
-    T.ok('mostra o QR code (imagem data:)', /^data:image\/svg\+xml/.test(qr ?? ''), (qr ?? '').slice(0, 40));
-    const segredo = (await page.locator('[data-teste=mfa-segredo]').innerText()).trim();
-    T.ok('mostra o código de texto para digitar no aplicativo', /^[A-Z2-7]{16,}$/.test(segredo), segredo);
-    const certo = B.totp(segredo);
-    await page.fill('[data-teste=mfa-codigo]', certo === '000000' ? '111111' : '000000');
-    await page.locator('[data-teste=mfa] button[type=submit]').click();
-    await page.locator('[data-teste=mfa] .g-erro').waitFor({ timeout: 15000 }).catch(() => {});
-    T.ok('código errado: avisa e não abre o painel', /não confere/.test(await page.locator('[data-teste=mfa]').innerText()) && (await page.locator('.g-adm-abas').count()) === 0);
-    await page.fill('[data-teste=mfa-codigo]', B.totp(segredo));
-    await page.locator('[data-teste=mfa] button[type=submit]').click();
-    await page.locator('.g-adm-abas').waitFor({ timeout: 30000 });
-    T.ok('código certo: o painel abre', await page.locator('.g-adm-abas').isVisible());
-    T.ok('o fator ficou cadastrado e conferido no Auth', B.num(`select count(*) from auth.mfa_factors where user_id='${uid}' and status='verified' and factor_type='totp'`) === 1);
-    B.segredosMfa.set(uid, segredo);
-
-    T.secao('painel do administrador sem violação da regra de conteúdo, aba por aba');
+    // a porta do painel (senha do painel, migração 20261247) tem a suíte dela: telas/senha-do-painel.js
+    T.ok('a senha do painel abre o painel', (await N.abrirOPainel(page)) === 'abriu' && await page.locator('.g-adm-abas').isVisible());
     for (const aba of ['Visão geral', 'Uso', 'Contas', 'Conversas', 'Escola', 'Cakto', 'Vendas', 'Erros', 'Aceites', 'Dados']) {
       await page.locator('.g-adm-abas button', { hasText: aba }).first().click();
       await page.locator('[data-aba]:not([data-aba-carregando])').first().waitFor({ timeout: 20000 }).catch(() => {});
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
     T.ok('nenhuma violação no painel', csp.length === 0, csp);
-    T.ok('sem erro na página do painel (fora a recusa do código errado)', erros.filter((e) => !/\/auth\/v1\/factors\/[^/]+\/verify/.test(e)).length === 0, erros);
-    await ctx.close();
-  }
-
-  T.secao('outro aparelho: senha certa, código antes do painel');
-  {
-    const { ctx, page } = await N.contexto(390, 844);
-    await N.entrar(page, L.emails.dono, L.senha);
-    await page.goto(B.BASE_URL + '/gestao/admin');
-    await page.locator('[data-teste=mfa-codigo-pedido]').waitFor({ timeout: 30000 });
-    T.ok('com o fator cadastrado: pede o código (sem QR code)', (await page.locator('[data-teste=mfa] img').count()) === 0 && (await page.locator('.g-adm-abas').count()) === 0);
-    T.ok('… e o banco não entrega o painel a esta sessão', await page.evaluate(async () => {
-      const k = Object.keys(localStorage).find((x) => { try { return !!JSON.parse(localStorage.getItem(x))?.access_token; } catch { return false; } });
-      const tok = JSON.parse(localStorage.getItem(k)).access_token;
-      return JSON.parse(atob(tok.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).aal;
-    }) === 'aal1');
-    T.ok('passa com o código do aplicativo', (await N.passarDoSegundoFator(page)) === 'codigo' && await page.locator('.g-adm-abas').isVisible());
+    T.ok('sem erro na página do painel', erros.length === 0, erros);
     await ctx.close();
   }
 

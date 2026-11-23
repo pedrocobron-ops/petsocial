@@ -81,7 +81,7 @@ const TEMPO = JSON.stringify({ code: '57014', details: null, hint: null, message
   for (const [largura, altura] of [[390, 844], [1366, 900]]) {
     const { ctx, page, erros } = await N.contexto(largura, altura);
     await N.entrar(page, L.emails.dono, L.senha);
-    await page.goto(B.BASE_URL + '/gestao/admin'); await N.passarDoSegundoFator(page);
+    await page.goto(B.BASE_URL + '/gestao/admin'); await N.abrirOPainel(page);
     await page.locator('.g-adm-abas').waitFor({ timeout: 20000 });
     await page.locator('[data-aba="visao"]:not([data-aba-carregando])').waitFor({ timeout: 20000 });
     // vigia: em nenhum momento a aba marcada mostra o conteúdo de outra
@@ -119,7 +119,7 @@ const TEMPO = JSON.stringify({ code: '57014', details: null, hint: null, message
   {
     const { ctx, page, erros } = await N.contexto(1366, 900);
     await N.entrar(page, L.emails.dono, L.senha);
-    await page.goto(B.BASE_URL + '/gestao/admin'); await N.passarDoSegundoFator(page);
+    await page.goto(B.BASE_URL + '/gestao/admin'); await N.abrirOPainel(page);
     await page.locator('.g-adm-abas').waitFor({ timeout: 20000 });
     await page.locator('.g-adm-abas button', { hasText: 'Contas' }).click();
     await page.locator('[data-aba="geral"]:not([data-aba-carregando])').waitFor({ timeout: 20000 });
@@ -172,7 +172,7 @@ const TEMPO = JSON.stringify({ code: '57014', details: null, hint: null, message
   {
     const { ctx, page } = await N.contexto(1366, 900);
     await N.entrar(page, L.emails.dono, L.senha);
-    await page.goto(B.BASE_URL + '/gestao/admin'); await N.passarDoSegundoFator(page);
+    await page.goto(B.BASE_URL + '/gestao/admin'); await N.abrirOPainel(page);
     await page.locator('.g-adm-abas button', { hasText: 'Escola' }).click();
     await page.locator('[data-aba="escola"]:not([data-aba-carregando]) [data-teste="escola-escondida"]').waitFor({ timeout: 15000 });
     const texto = await page.locator('[data-aba="escola"]').innerText();

@@ -21,7 +21,7 @@ const T = require('../lib/teste')('vendas-assinatura');
   B.must(await adm.auth.signUp({ email: `t-${L.suf}.admin@teste-auto.local`, password: SENHA, options: B.dadosDoCadastro() }), 'cadastro do admin');
   const uid = (await adm.auth.getUser()).data.user.id;
   B.sql(`insert into admins (user_id) values ('${uid}') on conflict do nothing`);
-  await B.adminForte(adm); // o painel só responde com o segundo fator (aal2, migração 20261245)
+  await B.adminAberto(adm); // o painel só responde depois da senha do painel (migração 20261247)
   T.depois(() => B.sql(`delete from admins where user_id='${uid}'; delete from auth.users where id='${uid}'`));
   const FILTRO = `chave like 'vendedor\\_%' or chave = 'assinatura_atraso_dias'`;
   const antes = B.sql(`select coalesce(json_agg(c), '[]') from config_interna c where ${FILTRO}`);

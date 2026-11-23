@@ -51,6 +51,60 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"admin_painel_sessoes": {
+                  Row: {
+                    "aberta_em": string,"sessao_id": string,"user_id": string,"vale_ate": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "aberta_em"?: string,"sessao_id": string,"user_id": string,"vale_ate": string
+                  }
+                  Update: {
+                    "aberta_em"?: string,"sessao_id"?: string,"user_id"?: string,"vale_ate"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "admin_painel_sessoes_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "admins"
+      referencedColumns: ["user_id"]
+    }
+                  ]
+                },"admin_senha_tentativas": {
+                  Row: {
+                    "bloqueado_ate": string | null,"erros": number,"ultima_em": string | null,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "bloqueado_ate"?: string | null,"erros"?: number,"ultima_em"?: string | null,"user_id": string
+                  }
+                  Update: {
+                    "bloqueado_ate"?: string | null,"erros"?: number,"ultima_em"?: string | null,"user_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"admin_senhas": {
+                  Row: {
+                    "definida_em": string,"email": string | null,"hash": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "definida_em"?: string,"email"?: string | null,"hash": string,"user_id": string
+                  }
+                  Update: {
+                    "definida_em"?: string,"email"?: string | null,"hash"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "admin_senhas_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: true
+      referencedRelation: "admins"
+      referencedColumns: ["user_id"]
+    }
+                  ]
                 },"admins": {
                   Row: {
                     "criado_em": string,"user_id": string
@@ -3389,6 +3443,12 @@ isOneToOne: false
 "admin_painel":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
+"admin_painel_abrir":
+{ Args: { "p_senha": string }; Returns: Json
+                           },
+"admin_painel_fechar":
+{ Args: Record<PropertyKey, never>; Returns: boolean
+                           },
 "admin_registros_acesso":
 { Args: { "p_email"?: string,"p_limite"?: number,"p_user"?: string }; Returns: Json
                            },
@@ -3400,6 +3460,9 @@ isOneToOne: false
                            },
 "admin_servidor_segredo":
 { Args: { "p_segredo": string }; Returns: undefined
+                           },
+"admin_senha_definir":
+{ Args: { "p_nova": string }; Returns: Json
                            },
 "admin_situacao":
 { Args: Record<PropertyKey, never>; Returns: Json
@@ -4995,9 +5058,6 @@ isOneToOne: false
                            },
 "servidor_segredo_registrar":
 { Args: { "p_segredo": string }; Returns: undefined
-                           },
-"sessao_forte":
-{ Args: Record<PropertyKey, never>; Returns: boolean
                            },
 "sou_admin":
 { Args: Record<PropertyKey, never>; Returns: boolean

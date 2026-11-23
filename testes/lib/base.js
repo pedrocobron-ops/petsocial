@@ -76,39 +76,64 @@ async function servidorNoAr() {
  */
 const dadosDoCadastro = () => ({ data: { app: 'maestro', aceite: require('./app').lib('documentos').aceiteDoCadastro() } });
 
-/* ---------- segundo fator do administrador (TOTP, migração 20261245) ---------- */
-/** Código TOTP de 6 números (RFC 6238, SHA-1, 30 s) a partir do segredo em base32 que o Supabase Auth devolve. */
-function totp(segredo, quando = Date.now()) {
-  const alfa = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  let bits = '';
-  for (const c of String(segredo).replace(/=+$/, '').toUpperCase().replace(/\s/g, '')) { const v = alfa.indexOf(c); if (v >= 0) bits += v.toString(2).padStart(5, '0'); }
-  const chave = Buffer.from((bits.match(/.{8}/g) ?? []).map((b) => parseInt(b, 2)));
-  const passo = Buffer.alloc(8); passo.writeBigUInt64BE(BigInt(Math.floor(quando / 30000)));
-  const h = crypto.createHmac('sha1', chave).update(passo).digest();
-  const o = h[h.length - 1] & 0xf;
-  return String(((h.readUInt32BE(o) & 0x7fffffff) % 1e6)).padStart(6, '0');
-}
-/** Segredos TOTP cadastrados nesta execução, por usuário (o navegador usa para passar da tela do código). */
-const segredosMfa = new Map();
+/* ---------- senha do painel do administrador (migração 20261247) ---------- */
+/** A senha do painel que os testes usam (cada admin de teste recebe esta, salvo quando o teste registra outra). */
+const SENHA_PAINEL = 'Painel-de-teste-2026';
 /**
- * Sessão forte de administrador (aal2) num cliente já logado: cadastra um fator TOTP (ou usa o desta execução) e confere um
- * código. Devolve o segredo. Precisa do TOTP ligado no Auth local ([auth.mfa.totp] no supabase/config.toml).
+ * Grava a senha do painel de um admin direto no banco (atalho de preparo: pela API, admin_senha_definir só aceita quem
+ * acabou de chegar pelo link do e-mail; esse caminho é provado em banco/senha-do-painel.js e telas/senha-do-painel.js).
  */
-async function adminForte(sb) {
+function registrarSenhaDoPainel(uid, senha = SENHA_PAINEL) {
+  sql(`insert into admin_senhas (user_id, hash, email) values ('${uid}', painel_senha_hash(${q(senha)}), (select lower(email) from auth.users where id = '${uid}'))
+       on conflict (user_id) do update set hash = excluded.hash, definida_em = now(), email = excluded.email;
+       delete from admin_senha_tentativas where user_id = '${uid}'`);
+}
+/**
+ * Admin com o painel aberto num cliente já logado: registra a senha de teste (se o admin ainda não tem) e abre o painel
+ * nesta sessão de login com admin_painel_abrir. Depois disto, sou_admin() diz sim para este cliente.
+ */
+async function adminAberto(sb, senha = SENHA_PAINEL) {
   const uid = (await sb.auth.getUser()).data.user?.id;
-  if (!uid) throw new Error('adminForte: cliente sem login');
-  let fator = null, segredo = segredosMfa.get(uid);
-  const f = must(await sb.auth.mfa.listFactors(), 'fatores');
-  const pronto = f.totp.find((x) => x.status === 'verified');
-  if (pronto && segredo) fator = pronto.id;
-  else {
-    for (const x of f.all) if (x.factor_type === 'totp') await sb.auth.mfa.unenroll({ factorId: x.id });
-    const e = must(await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName: `teste ${sufixo()}` }), 'cadastro do fator (TOTP ligado no Auth local?)');
-    fator = e.id; segredo = e.totp.secret;
-    segredosMfa.set(uid, segredo);
+  if (!uid) throw new Error('adminAberto: cliente sem login');
+  if (num(`select count(*) from admin_senhas where user_id = '${uid}'`) === 0) registrarSenhaDoPainel(uid, senha);
+  const r = must(await sb.rpc('admin_painel_abrir', { p_senha: senha }), 'abrir o painel');
+  if (!r || r.ok !== true) throw new Error(`adminAberto: o painel não abriu (${JSON.stringify(r)}); o usuário está em admins?`);
+  return r;
+}
+
+/* ---------- e-mails do Auth local (Mailpit) ---------- */
+const MAILPIT_URL = (process.env.MAILPIT_URL || 'http://127.0.0.1:54324').replace(/\/$/, '');
+/**
+ * O e-mail mais novo que o Auth local mandou para este endereço depois de `desde` (ms), lido no Mailpit:
+ * { assunto, link (o primeiro do e-mail), texto }. Espera até 15 s.
+ */
+async function emailRecebido(email, desde = 0) {
+  for (let k = 0; k < 30; k++) {
+    const l = await (await fetch(`${MAILPIT_URL}/api/v1/search?query=${encodeURIComponent('to:' + email)}`)).json();
+    const m = (l.messages ?? []).find((x) => new Date(x.Created).getTime() >= desde - 1000);
+    if (m) {
+      const c = await (await fetch(`${MAILPIT_URL}/api/v1/message/${m.ID}`)).json();
+      const link = ((c.HTML || '').match(/href="([^"]+)"/) || [])[1]?.replace(/&amp;/g, '&') ?? ((c.Text || '').match(/https?:\/\/\S+/) || [])[0] ?? null;
+      return { assunto: c.Subject, link, texto: c.Text || '' };
+    }
+    await new Promise((r) => setTimeout(r, 500));
   }
-  must(await sb.auth.mfa.challengeAndVerify({ factorId: fator, code: totp(segredo) }), 'código do fator');
-  return segredo;
+  throw new Error(`nenhum e-mail para ${email} no Mailpit (${MAILPIT_URL}); o Supabase local está no ar?`);
+}
+/**
+ * Pede o link de entrada por e-mail (como a tela da senha do painel), abre o link e põe no cliente a sessão que ele dá
+ * (a sessão de quem "acabou de chegar pelo e-mail"). Devolve { link, destino } (para onde o Auth mandou de volta).
+ */
+async function chegarPeloEmail(sb, email, voltarPara = `${BASE_URL}/gestao/admin`) {
+  const desde = Date.now();
+  must(await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: voltarPara } }), 'pedido do link por e-mail');
+  const { link } = await emailRecebido(email, desde);
+  if (!link) throw new Error('o e-mail veio sem link');
+  const destino = (await fetch(link, { redirect: 'manual' })).headers.get('location') ?? '';
+  const p = new URLSearchParams(destino.split('#')[1] ?? '');
+  if (!p.get('access_token')) throw new Error('o link do e-mail não deu sessão: ' + destino.slice(0, 200));
+  must(await sb.auth.setSession({ access_token: p.get('access_token'), refresh_token: p.get('refresh_token') }), 'sessão do link');
+  return { link, destino };
 }
 
 /* ---------- trava do servidor (segredo que só o servidor tem; ver src/lib/gestao/servidor.ts) ---------- */
@@ -128,4 +153,4 @@ async function comTravaDoServidor(f) {
   }
 }
 
-module.exports = { segredoDoServidor, comTravaDoServidor, totp, segredosMfa, adminForte, RAIZ, dadosDoCadastro, ENV, SUPABASE_URL, SUPABASE_KEY, BASE_URL, DB_CONTAINER, cliente, sql, num, q, must, uuid, sufixo, ipAleatorio, centavos, hojeNo, somaDias, diaDaSemana, proximoDia, instante, servidorNoAr };
+module.exports = { segredoDoServidor, comTravaDoServidor, SENHA_PAINEL, registrarSenhaDoPainel, adminAberto, MAILPIT_URL, emailRecebido, chegarPeloEmail, RAIZ, dadosDoCadastro, ENV, SUPABASE_URL, SUPABASE_KEY, BASE_URL, DB_CONTAINER, cliente, sql, num, q, must, uuid, sufixo, ipAleatorio, centavos, hojeNo, somaDias, diaDaSemana, proximoDia, instante, servidorNoAr };

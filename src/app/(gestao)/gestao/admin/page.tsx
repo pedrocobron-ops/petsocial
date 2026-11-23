@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronDown, ChevronRight, Download, LogOut, RefreshCw, Search } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, Download, Lock, LogOut, RefreshCw, Search } from "lucide-react";
 import AbaUso, { type Uso, type UsoConta, SINAIS, sinaisDe, tempo, vistoHa } from "@/components/gestao/admin/uso";
 import AbaVisao from "@/components/gestao/admin/visao";
 import ContaAssinatura from "@/components/gestao/admin/conta";
@@ -14,9 +14,10 @@ import AbaErros from "@/components/gestao/admin/erros";
 import AbaAceites from "@/components/gestao/admin/aceites";
 import AbaVendas from "@/components/gestao/admin/vendas";
 import AbaDados, { LembreteDaCopia, LembreteDasRotinas } from "@/components/gestao/admin/dados";
-import SegundoFator from "@/components/gestao/admin/segundo-fator";
+import SenhaDoPainel from "@/components/gestao/admin/senha-do-painel";
 import { AvisosProvider, Campo, Esqueleto, Folha, Vazio, mensagemDeErro, ok, useAvisos } from "@/components/gestao/ui";
 import { banco, configurado } from "@/lib/gestao/supabase";
+import { type SituacaoDoPainel, lerSituacao } from "@/lib/gestao/senha-do-painel";
 import { dataCompleta, fmtTelefone, haQuanto, hora, isoDia, semAcento } from "@/lib/gestao/util";
 
 type Status = "teste" | "ativa" | "atrasada" | "cancelada" | "cortesia";
@@ -97,8 +98,11 @@ export default function Pagina() {
 function Admin() {
   const router = useRouter();
   const { avisarErro } = useAvisos();
-  const [acesso, setAcesso] = useState<"vendo" | "fator" | "sim" | "nao">("vendo");
-  const [usuario, setUsuario] = useState("");
+  const [acesso, setAcesso] = useState<"vendo" | "senha" | "sim" | "nao">("vendo");
+  const [usuario, setUsuario] = useState({ id: "", email: "" });
+  const [situacao, setSituacao] = useState<SituacaoDoPainel | null>(null);
+  const [porta, setPorta] = useState(0);
+  const [fechouAgora, setFechouAgora] = useState(false);
   const [lojas, setLojas] = useState<Loja[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
@@ -110,7 +114,10 @@ function Admin() {
   const [contas, setContas] = useState<UsoConta[]>([]);
   const [vez, setVez] = useState(0);
 
-  const carregar = useCallback(async () => {
+  // o painel fechou no meio do uso (venceu, ou foi fechado em outra aba): volta para a senha do painel
+  const reverSituacao = useRef<() => void>(() => {});
+
+  const carregar = useCallback(async (rever = true) => {
     setAtualizando(true);
     try {
       const [l, u, c] = await Promise.all([banco().rpc("admin_painel"), banco().rpc("admin_uso"), banco().rpc("admin_uso_contas")]);
@@ -121,39 +128,52 @@ function Admin() {
       setErro(null);
     } catch (e) {
       setErro(mensagemDeErro(e));
+      if (rever && /acesso restrito/i.test(mensagemDeErro(e))) reverSituacao.current();
     } finally {
       setAtualizando(false);
     }
   }, []);
 
+  /**
+   * É da equipe? O painel já está aberto nesta sessão de login? (os dados só saem depois da senha do painel: sou_admin,
+   * migração 20261247). Chamado ao chegar, depois da senha e quando a sessão de login muda (link ou código do e-mail).
+   */
+  const verSituacao = useCallback(async (vivo: () => boolean = () => true) => {
+    if (!configurado) { setErro("O sistema ainda não está ligado neste endereço."); setAcesso("nao"); return; }
+    const { data } = await banco().auth.getSession();
+    if (!vivo()) return;
+    if (!data.session) { router.replace("/gestao/entrar"); return; }
+    setUsuario({ id: data.session.user.id, email: data.session.user.email ?? "" });
+    const r = await banco().rpc("admin_situacao");
+    if (!vivo()) return;
+    if (r.error) { setErro(mensagemDeErro(r.error)); setAcesso("nao"); return; }
+    const s = lerSituacao(r.data);
+    if (!s) { setErro("O painel está sendo atualizado. Tente de novo em alguns minutos."); setAcesso("nao"); return; }
+    if (!s.admin) { setAcesso("nao"); return; }
+    setErro(null);
+    setSituacao(s);
+    setPorta((n) => n + 1);
+    if (!s.aberto) { setLojas(null); setUso([]); setContas([]); setAbertaId(null); setAcesso("senha"); return; }
+    setAcesso("sim");
+    void carregar(false);
+  }, [router, carregar]);
+
   useEffect(() => {
     let vivo = true;
-    (async () => {
-      if (!configurado) { setErro("O sistema ainda não está ligado neste endereço."); setAcesso("nao"); return; }
-      const { data } = await banco().auth.getSession();
-      if (!vivo) return;
-      if (!data.session) { router.replace("/gestao/entrar"); return; }
-      setUsuario(data.session.user.id);
-      // é da equipe? a sessão já passou pelo segundo fator? (os dados do painel só saem com ele: sou_admin, migração 20261245)
-      const r = await banco().rpc("admin_situacao");
-      if (!vivo) return;
-      if (r.error && (r.error.code === "PGRST202" || r.error.code === "42883")) {
-        // banco sem a função nova: como antes
-        const v = await banco().rpc("sou_admin");
-        if (!vivo) return;
-        if (v.error) { setErro(mensagemDeErro(v.error)); setAcesso("nao"); return; }
-        if (!v.data) { setAcesso("nao"); return; }
-        setAcesso("sim"); void carregar(); return;
-      }
-      if (r.error) { setErro(mensagemDeErro(r.error)); setAcesso("nao"); return; }
-      const s = r.data as { admin?: boolean; forte?: boolean } | null;
-      if (!s?.admin) { setAcesso("nao"); return; }
-      if (!s.forte) { setAcesso("fator"); return; }
-      setAcesso("sim");
-      void carregar();
-    })();
+    reverSituacao.current = () => void verSituacao(() => vivo);
+    void verSituacao(() => vivo);
     return () => { vivo = false; };
-  }, [router, carregar]);
+  }, [verSituacao]);
+
+  /** Fecha o painel nesta sessão, sem sair da conta: os dados saem da tela e a senha do painel é pedida de novo. */
+  async function fecharPainel() {
+    try {
+      const r = await banco().rpc("admin_painel_fechar");
+      if (r.error) throw new Error(r.error.message);
+    } catch (e) { avisarErro(e); return; }
+    setFechouAgora(true);
+    await verSituacao();
+  }
 
   async function sair() {
     try { await banco().auth.signOut(); } catch (e) { avisarErro(e); }
@@ -192,7 +212,10 @@ function Admin() {
   }
 
   if (acesso === "vendo") return <main className="g-main"><Esqueleto linhas={5} /></main>;
-  if (acesso === "fator") return <SegundoFator usuario={usuario} aoPassar={() => { setAcesso("sim"); void carregar(); }} aoSair={() => void sair()} />;
+  if (acesso === "senha" && situacao) {
+    return <SenhaDoPainel key={porta} usuario={usuario.id} email={usuario.email} situacao={situacao} pelaSenha={fechouAgora}
+      aoAbrir={() => { setFechouAgora(false); setAcesso("sim"); void carregar(); }} aoRever={() => void verSituacao()} aoSair={() => void sair()} />;
+  }
   if (acesso === "nao") {
     return (
       <main className="g-main">
@@ -213,6 +236,7 @@ function Admin() {
         <div className="g-acoes">
           <Link className="g-btn sec" href="/gestao/app"><ArrowLeft /> Meu pet shop</Link>
           <button className="g-btn sec" onClick={() => void carregar()} disabled={atualizando}><RefreshCw /> {atualizando ? "Atualizando…" : "Atualizar"}</button>
+          <button className="g-btn sec" data-teste="painel-fechar" onClick={() => void fecharPainel()}><Lock /> Fechar o painel</button>
           <button className="g-btn fantasma" onClick={() => void sair()}><LogOut /> Sair</button>
         </div>
       </header>
