@@ -52,6 +52,10 @@ export default function ResumoDoDia() {
   const guiaNaFrente = souDono && liberado && !petshop.guia_feito_em;
   const guiaRef = useRef(guiaNaFrente);
   guiaRef.current = guiaNaFrente;
+  // o guia esteve na frente nesta abertura do aplicativo: quem acabou de começar segue o caminho do guia (marcar o primeiro
+  // horário, copiar o link) e o resumo não abre sozinho por cima. Ele aparece na próxima entrada, ou pelo botão da tela Hoje.
+  const guiaEsteve = useRef(guiaNaFrente);
+  if (guiaNaFrente) guiaEsteve.current = true;
 
   const ler = useCallback(async (): Promise<DadosDoResumo | null> => {
     // contas fixas: a conta do mês entra em A pagar antes de o resumo ler (só quem cuida do financeiro)
@@ -82,7 +86,7 @@ export default function ResumoDoDia() {
       if (!vivo || !d) return;
       if (d.visto) { guardarLembrado(chave, d.dia); return; }
       const tentar = () => {
-        if (!vivo) return;
+        if (!vivo || guiaEsteve.current) return;
         if (guiaRef.current || temDialogoNaFrente()) { relogio = window.setTimeout(tentar, 800); return; }
         receber(d);
         setAberto(true);

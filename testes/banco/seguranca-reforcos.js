@@ -1,5 +1,4 @@
-// Reforços de segurança (migração 20261245): painel do administrador só com o segundo fator (aal2), teto da IA do teste grátis
-// e e-mail do dono confirmado, IP dos aceites públicos só com o segredo do servidor, freio por rede do link (Tirar dúvida e as
+// Reforços de segurança (migração 20261245): teto da IA do teste grátis e e-mail do dono confirmado, IP dos aceites públicos só com o segredo do servidor, freio por rede do link (Tirar dúvida e as
 // consultas anônimas), bucket `pets` privado (equipe por endereço assinado, logo e página do tutor pelas rotas do servidor) e
 // as chaves compostas (lançamento e foto do diário de outro pet shop não entram).
 const crypto = require('crypto');
@@ -29,52 +28,7 @@ function configTemporaria(chave, valor) {
   const anon = B.cliente();
   const P = L.P;
 
-  // ---------------------------------------------------------------- 1
-  T.secao('painel do administrador com o segundo fator');
-  const adm = B.cliente();
-  const emailAdm = `t-${L.suf}.admin@teste-auto.local`;
-  B.must(await adm.auth.signUp({ email: emailAdm, password: SENHA, options: B.dadosDoCadastro() }), 'cadastro do admin');
-  const uid = (await adm.auth.getUser()).data.user.id;
-  B.sql(`insert into admins (user_id) values ('${uid}') on conflict do nothing`);
-  T.depois(() => B.sql(`delete from admins where user_id='${uid}'`));
-  const aal = async (sb) => JSON.parse(Buffer.from((await sb.auth.getSession()).data.session.access_token.split('.')[1], 'base64url').toString()).aal;
-  T.ok('a sessão com senha é aal1', (await aal(adm)) === 'aal1');
-  const s1 = B.must(await adm.rpc('admin_situacao'), 'situação');
-  T.ok('admin_situacao: é admin, sessão ainda não é forte', s1.admin === true && s1.forte === false, s1);
-  T.ok('sou_admin() é false com aal1', (await adm.rpc('sou_admin')).data === false);
-  for (const f of ['admin_painel', 'admin_visao_geral', 'admin_uso_contas', 'admin_servidor_estado', 'admin_erros', 'admin_copias']) {
-    T.recusa(`${f} recusado com aal1 (só a senha)`, await adm.rpc(f, f === 'admin_erros' ? { p_horas: 24, p_resolvidos: false } : {}), /restrito|Acesso/i);
-  }
-  T.recusa('admin_atualizar recusado com aal1', await adm.rpc('admin_atualizar', { p_petshop: P, p_status: 'ativa' }));
-  T.ok('… e a loja continua em teste', B.sql(`select status from petshops where id='${P}'`) === 'teste');
-  const tokenAal1 = (await adm.auth.getSession()).data.session.access_token;
-  const copia1 = await fetch(`${B.BASE_URL}/api/gestao/admin/copia`, { headers: { authorization: `Bearer ${tokenAal1}` } });
-  T.ok('rota da cópia completa: 403 com aal1', copia1.status === 403, copia1.status);
-  void copia1.body?.cancel();
-  T.ok('admin_situacao de quem não é admin: admin = false', B.must(await dono.rpc('admin_situacao'), 'situação do dono').admin === false);
-  T.ok('anônimo não chama admin_situacao', !!(await anon.rpc('admin_situacao')).error);
-
-  const segredo = await B.adminForte(adm);
-  T.ok('cadastrou o fator TOTP e conferiu o código: a sessão vira aal2', (await aal(adm)) === 'aal2' && /^[A-Z2-7]{16,}$/.test(segredo), await aal(adm));
-  T.ok('admin_situacao: forte', B.must(await adm.rpc('admin_situacao'), 'situação').forte === true);
-  T.ok('sou_admin() é true com aal2', (await adm.rpc('sou_admin')).data === true);
-  T.passa('admin_painel responde com aal2', await adm.rpc('admin_painel'));
-  T.passa('admin_servidor_estado responde com aal2', await adm.rpc('admin_servidor_estado'));
-  const copia2 = await fetch(`${B.BASE_URL}/api/gestao/admin/copia`, { headers: { authorization: `Bearer ${(await adm.auth.getSession()).data.session.access_token}` } });
-  T.ok('rota da cópia completa: passa da conferência com aal2 (200, ou 503 sem a chave de serviço)', [200, 503].includes(copia2.status), copia2.status);
-  void copia2.body?.cancel();
-  // outra sessão do mesmo admin (outro aparelho): só a senha não basta, o código do aplicativo sim
-  const adm2 = B.cliente();
-  B.must(await adm2.auth.signInWithPassword({ email: emailAdm, password: SENHA }), 'login de novo');
-  T.recusa('outro aparelho com a senha certa e sem o código: recusado', await adm2.rpc('admin_painel'));
-  const fatores = B.must(await adm2.auth.mfa.listFactors(), 'fatores');
-  T.recusa('código errado não passa', await adm2.auth.mfa.challengeAndVerify({ factorId: fatores.totp[0].id, code: B.totp(segredo) === '000000' ? '111111' : '000000' }));
-  await B.adminForte(adm2);
-  T.passa('com o código do aplicativo: passa', await adm2.rpc('admin_painel'));
-  T.ok('o dono comum continua sem acesso ao painel', !!(await dono.rpc('admin_painel')).error);
-  T.ok('nenhuma função fora do painel usa sou_admin() (só admin_* e as regras da Escola)',
-    B.sql(`select coalesce(string_agg(proname, ','), '') from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-           where n.nspname = 'public' and prosrc ilike '%sou_admin()%' and proname not like 'admin\\_%' and proname <> 'sou_admin'`) === '');
+  // (1) o painel do administrador: o segundo fator de 20261245 deu lugar à senha do painel (banco/senha-do-painel.js)
 
   // ---------------------------------------------------------------- 2
   T.secao('IA do teste grátis: teto próprio e e-mail confirmado');

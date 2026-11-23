@@ -173,7 +173,7 @@ end $$; select current_setting('teste.soltas');`);
   const rot = `teste-${L.suf}`;
   T.depois(() => B.sql(`delete from rotinas_execucoes where nome = '${rot}'; delete from admins where user_id = '${uidAdm}'`));
   B.sql(`insert into admins (user_id) values ('${uidAdm}') on conflict do nothing`);
-  await B.adminForte(adm); // o painel só responde com o segundo fator (aal2, migração 20261245)
+  await B.adminAberto(adm); // o painel só responde depois da senha do painel (migração 20261247)
   B.sql(`select public.rotina_anotar('${rot}', true, '{"contas": 2}'::jsonb)`);
   const ler = async () => (B.must(await adm.rpc('admin_rotinas'), 'admin_rotinas').rotinas ?? []).find((r) => r.nome === rot);
   let r1 = await ler();
